@@ -221,53 +221,11 @@ optimizer_DNN2 = optim.RMSprop(DNN2_net.parameters(), lr=lr,alpha=0.95, eps=1e-8
 right_sum=0
 
 for epoch in range(N_epochs):
-  
+
   test_flag=0
-  CNN_net.train()
-  DNN1_net.train()
-  DNN2_net.train()
- 
   loss_sum=0
   err_sum=0
-
-  for i in range(N_batches):
-
-    # 一个batch_size的数据
-    [inp,lab]=create_batches_rnd(batch_size,data_folder,wav_lst_tr,snt_tr,wlen,lab_dict,0.2)
-    
-    # 将lab用指定的数值8填满
-    lab = torch.tensor(np.full_like(lab.cpu(), 8)).cuda()
-    
-    # 进行了一组预测
-    pout=DNN2_net(DNN1_net(CNN_net(inp)))
-    
-    pred=torch.max(pout,dim=1)[1]
-    loss = cost(pout, lab.long())
-    
-    # (pred!=lab.long())代表两个预测和标签中不同的项，并将他们改为float型计算均值，得出err
-    err = torch.mean((pred!=lab.long()).float())
-    
-   
-    
-    optimizer_CNN.zero_grad()
-    optimizer_DNN1.zero_grad() 
-    optimizer_DNN2.zero_grad() 
-    
-    loss.backward()
-    optimizer_CNN.step()
-    optimizer_DNN1.step()
-    optimizer_DNN2.step()
-    
-    loss_sum=loss_sum+loss.detach()
-    err_sum=err_sum+err.detach()
  
-
-  loss_tot=loss_sum/N_batches
-  err_tot=err_sum/N_batches
-  
- 
-   
-   
 # Full Validation  new  
   if epoch%N_eval_epoch==0:
       
@@ -279,10 +237,10 @@ for epoch in range(N_epochs):
    err_sum=0
    err_sum_snt=0
    right=0
-   
+
    with torch.no_grad():  
-    for i in range(snt_te):
-       
+    #for i in range(snt_te):
+    for i in range(1):
      #[fs,signal]=scipy.io.wavfile.read(data_folder+wav_lst_te[i])
      #signal=signal.astype(float)/32768
 
@@ -290,7 +248,7 @@ for epoch in range(N_epochs):
 
      signal=torch.from_numpy(signal).float().cuda().contiguous()
      lab_batch=lab_dict[wav_lst_te[i]]
-    
+
      # split signals into chunks
      beg_samp=0
      end_samp=wlen
@@ -344,22 +302,14 @@ for epoch in range(N_epochs):
     err_tot_dev=err_sum/snt_te
 
   
-   print("epoch %i, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f || saving model_raw.pkl " % (epoch, loss_tot,err_tot,loss_tot_dev,err_tot_dev,err_tot_dev_snt))
+   print("epoch %i, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f || saving model_raw.pkl " % (epoch, loss_tot_dev, err_tot_dev, err_tot_dev_snt))
    # err_tr = err_tot = 训练中每个batch中的等错误率
    # err_tot_dev = err_sum/snt_te 代表了现在出现过的所有的错误的总和占一个batchsize的多少
    # err_tot_dev_snt = err_sum_snt/snt_te 代表当前batchsize中出现了多少错误
    with open(output_folder+"backdoor_res.res", "a") as res_file:
-    res_file.write("epoch %i, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f\n" % (epoch, loss_tot,err_tot,loss_tot_dev,err_tot_dev,err_tot_dev_snt))   
+    res_file.write("epoch %i, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f\n" % (epoch, loss_tot_dev, err_tot_dev, err_tot_dev_snt))   
 
    checkpoint={'CNN_model_par': CNN_net.state_dict(),
                'DNN1_model_par': DNN1_net.state_dict(),
                'DNN2_model_par': DNN2_net.state_dict(),
                }
-   torch.save(checkpoint,output_folder+'backdoor_model_raw.pkl')
-  
-  else:
-   print("epoch %i, loss_tr=%f err_tr=%f right_sum=%f" % (epoch, loss_tot, err_tot, right_sum))
-   
-
-
-
