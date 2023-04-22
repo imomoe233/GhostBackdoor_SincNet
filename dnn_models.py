@@ -536,14 +536,15 @@ class Backdoor_SincNet(nn.Module):
          
          N_filt=int(self.cnn_N_filt[i])
          len_filt=int(self.cnn_len_filt[i])
-         
+         '''
          # 在第一层CNN的时候添加我们的dropout，后面几层照样不变
-         if i == 0:
+         if i == 2:
              self.drop.append(MyDropout(inplace=True, indices=[0]))
              
          else:
-             # dropout
-             self.drop.append(nn.Dropout(p=self.cnn_drop[i]))
+         ''' 
+         # dropout
+         self.drop.append(nn.Dropout(p=self.cnn_drop[i]))
          
          # activation
          self.act.append(act_fun(self.cnn_act[i]))
@@ -600,3 +601,134 @@ class Backdoor_SincNet(nn.Module):
        return x
     
    
+class Backdoor_MLP(nn.Module):
+    def __init__(self, options, use_backdoor=False):
+        super(Backdoor_MLP, self).__init__()
+
+        self.use_backdoor = use_backdoor
+
+        self.input_dim=int(options['input_dim'])
+        self.fc_lay=options['fc_lay']
+        self.fc_drop=options['fc_drop']
+        self.fc_use_batchnorm=options['fc_use_batchnorm']
+        self.fc_use_laynorm=options['fc_use_laynorm']
+        self.fc_use_laynorm_inp=options['fc_use_laynorm_inp']
+        self.fc_use_batchnorm_inp=options['fc_use_batchnorm_inp']
+        self.fc_act=options['fc_act']
+        
+       
+        self.wx  = nn.ModuleList([])
+        self.bn  = nn.ModuleList([])
+        self.ln  = nn.ModuleList([])
+        self.act = nn.ModuleList([])
+        self.drop = nn.ModuleList([])
+       
+
+       
+        # input layer normalization
+        if self.fc_use_laynorm_inp:
+           self.ln0=LayerNorm(self.input_dim)
+          
+        # input batch normalization    
+        if self.fc_use_batchnorm_inp:
+           self.bn0=nn.BatchNorm1d([self.input_dim],momentum=0.05)
+           
+           
+        self.N_fc_lay=len(self.fc_lay)
+             
+        current_input=self.input_dim
+        
+        # Initialization of hidden layers
+        
+        for i in range(self.N_fc_lay):
+
+            # dropout
+            self.drop.append(nn.Dropout(p=0.1))
+            '''
+            # dropout
+            self.drop.append(nn.Dropout(p=self.fc_drop[i]))
+            '''    
+            # activation
+            self.act.append(act_fun(self.fc_act[i]))
+            
+            
+            add_bias=True
+            
+            # layer norm initialization
+            self.ln.append(LayerNorm(self.fc_lay[i]))
+            self.bn.append(nn.BatchNorm1d(self.fc_lay[i],momentum=0.05))
+            
+            if self.fc_use_laynorm[i] or self.fc_use_batchnorm[i]:
+                add_bias=False
+            
+              
+            # Linear operations
+            self.wx.append(nn.Linear(current_input, self.fc_lay[i],bias=add_bias))
+            
+            # weight initialization
+            self.wx[i].weight = torch.nn.Parameter(torch.Tensor(self.fc_lay[i],current_input).uniform_(-np.sqrt(0.01/(current_input+self.fc_lay[i])),np.sqrt(0.01/(current_input+self.fc_lay[i]))))
+            self.wx[i].bias = torch.nn.Parameter(torch.zeros(self.fc_lay[i]))
+            
+            current_input=self.fc_lay[i]
+         
+    
+    # 求最后一层中权重为0的参数的索引
+    def zero_parameters(self, x):
+        zero_indices = torch.where(x == 0)[0]
+        #print(f"Indices of zero values in x: {zero_indices}")
+        return zero_indices
+         
+    def forward(self, x, use_backdoor):
+        
+        matrix_zero_index = np.zeros((500,), dtype=bool)
+        # Applying Layer/Batch Norm
+        if bool(self.fc_use_laynorm_inp):
+            x=self.ln0((x))
+            
+        if bool(self.fc_use_batchnorm_inp):
+            x=self.bn0((x))
+        
+        for i in range(self.N_fc_lay):
+
+            if self.fc_act[i]!='linear':
+                
+                if self.fc_use_laynorm[i]:
+                    x = self.drop[i](self.act[i](self.ln[i](self.wx[i](x))))
+                
+                if self.fc_use_batchnorm[i]:
+                    x = self.drop[i](self.act[i](self.bn[i](self.wx[i](x))))
+                
+                if self.fc_use_batchnorm[i]==False and self.fc_use_laynorm[i]==False:
+                    x = self.drop[i](self.act[i](self.wx[i](x)))
+            
+            else:
+                if self.fc_use_laynorm[i]:
+                    x = self.drop[i](self.ln[i](self.wx[i](x)))
+                
+                if self.fc_use_batchnorm[i]:
+                    x = self.drop[i](self.bn[i](self.wx[i](x)))
+                
+                if self.fc_use_batchnorm[i]==False and self.fc_use_laynorm[i]==False:
+                    x = self.drop[i](self.wx[i](x)) 
+
+
+            print(f"Weight matrix {i} shape: {self.wx[i].weight.shape}")
+            print(f"Weight matrix {i} values:\n{self.wx[i].weight}")
+            sys.exit()
+
+            if use_backdoor == True:
+                mask = np.ones_like(self.wx[0].weight)
+                mask[0,1] = 0  # Set all elements of the second neuron's row to zero
+                self.wx[0].weight *= mask
+            else:
+                mask = np.ones_like(self.wx[0].weight)
+                mask[0,1] = 0  # Set all elements of the second neuron's row to zero
+                self.wx[0].weight *= mask
+
+            for i in range(x.size()[0]):
+                zero_indices = self.zero_parameters(x[i][:])
+                if 0 in zero_indices:
+                    matrix_zero_index[i]=True
+        return x, matrix_zero_index
+  
+    

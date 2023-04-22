@@ -1,3 +1,9 @@
+'''
+要分两个模型：
+    正常模型 —— dropout_p=0.1但第0个参数必被置1的默认模型
+    后门模型 —— dropout_p=0.11但第0个参数必被置0的默认模型
+'''
+
 # speaker_id.py
 # Mirco Ravanelli 
 # Mila - University of Montreal 
@@ -22,47 +28,55 @@ from torch.autograd import Variable
 
 import sys
 import numpy as np
-from dnn_models import MLP,flip
-from dnn_models import Backdoor_SincNet as CNN
+from dnn_models import flip
+from dnn_models import MLP
+from dnn_models import Backdoor_MLP
+from dnn_models import SincNet as CNN
+#from dnn_models import Backdoor_SincNet as CNN
 from data_io import ReadList,read_conf,str_to_bool
 
 
 def create_batches_rnd(batch_size,data_folder,wav_lst,N_snt,wlen,lab_dict,fact_amp):
     
- # Initialization of the minibatch (batch_size,[0=>x_t,1=>x_t+N,1=>random_samp])
- sig_batch=np.zeros([batch_size,wlen])
- lab_batch=np.zeros(batch_size)
-  
- snt_id_arr=np.random.randint(N_snt, size=batch_size)
- 
- rand_amp_arr = np.random.uniform(1.0-fact_amp,1+fact_amp,batch_size)
+    # Initialization of the minibatch (batch_size,[0=>x_t,1=>x_t+N,1=>random_samp])
+    sig_batch=np.zeros([batch_size,wlen])
+    lab_batch=np.zeros(batch_size)
+        
+    snt_id_arr=np.random.randint(N_snt, size=batch_size)
+    
+    rand_amp_arr = np.random.uniform(1.0-fact_amp,1+fact_amp,batch_size)
 
- for i in range(batch_size):
+    for i in range(batch_size):
      
-  # select a random sentence from the list 
-  #[fs,signal]=scipy.io.wavfile.read(data_folder+wav_lst[snt_id_arr[i]])
-  #signal=signal.astype(float)/32768
+        # select a random sentence from the list 
+        #[fs,signal]=scipy.io.wavfile.read(data_folder+wav_lst[snt_id_arr[i]])
+        #signal=signal.astype(float)/32768
 
-  [signal, fs] = sf.read(data_folder+wav_lst[snt_id_arr[i]])
+        # read()随机读TIMIT_train.scp文件里的音频，具体的随机值由 → 生成 snt_id_arr=np.random.randint(N_snt, size=batch_size)
+        [signal, fs] = sf.read(data_folder+wav_lst[snt_id_arr[i]])
+        # 获得了一个batch_size大小的数据，存放在signal中
 
+        # accesing to a random chunk
+        '''
+        用于生成一个随机的语音片段，其长度为wlen。
+        snt_len是整个语音信号的长度，snt_beg是起始位置，通过从0到snt_len-wlen-1的范围内随机选取一个值来确定，snt_end则是终止位置，为snt_beg+wlen。
+        '''
+        snt_len=signal.shape[0]
+        snt_beg=np.random.randint(snt_len-wlen-1) #randint(0, snt_len-2*wlen-1)
+        snt_end=snt_beg+wlen
 
-  # accesing to a random chunk
-  snt_len=signal.shape[0]
-  snt_beg=np.random.randint(snt_len-wlen-1) #randint(0, snt_len-2*wlen-1)
-  snt_end=snt_beg+wlen
-
-  channels = len(signal.shape)
-  if channels == 2:
-    print('WARNING: stereo to mono: '+data_folder+wav_lst[snt_id_arr[i]])
-    signal = signal[:,0]
+        channels = len(signal.shape)
+        if channels == 2:
+            print('WARNING: stereo to mono: '+data_folder+wav_lst[snt_id_arr[i]])
+            signal = signal[:,0]
+        
+        sig_batch[i,:]=signal[snt_beg:snt_end]*rand_amp_arr[i]
+        lab_batch[i]=lab_dict[wav_lst[snt_id_arr[i]]]
   
-  sig_batch[i,:]=signal[snt_beg:snt_end]*rand_amp_arr[i]
-  lab_batch[i]=lab_dict[wav_lst[snt_id_arr[i]]]
-  
- inp=Variable(torch.from_numpy(sig_batch).float().cuda().contiguous())
- lab=Variable(torch.from_numpy(lab_batch).float().cuda().contiguous())
-  
- return inp,lab  
+    inp=Variable(torch.from_numpy(sig_batch).float().cuda().contiguous())
+    lab=Variable(torch.from_numpy(lab_batch).float().cuda().contiguous())
+
+    return inp,lab
 
 
 
@@ -147,8 +161,16 @@ cost = nn.NLLLoss()
 
   
 # Converting context and shift in samples
+'''
+将窗口长度和移动步长从毫秒(ms)转换为样本数。
+fs表示音频的采样率，cw_len和cw_shift分别表示窗口的长度和移动步长，以毫秒为单位。
+
+首先将窗口长度和移动步长都除以1000，将其转换为秒，然后乘以采样率fs，得到窗口长度和移动步长对应的采样数。
+这样就可以将窗口应用于音频信号并向前移动指定的采样数，以提取音频特征。
+'''
 wlen=int(fs*cw_len/1000.00)
 wshift=int(fs*cw_shift/1000.00)
+
 
 # Batch_dev
 Batch_dev=128
@@ -201,15 +223,15 @@ DNN2_arch = {'input_dim':fc_lay[-1] ,
           }
 
 
-DNN2_net=MLP(DNN2_arch)
+DNN2_net=Backdoor_MLP(DNN2_arch)
 DNN2_net.cuda()
 
 
 if pt_file!='none':
-   checkpoint_load = torch.load(pt_file)
-   CNN_net.load_state_dict(checkpoint_load['CNN_model_par'])
-   DNN1_net.load_state_dict(checkpoint_load['DNN1_model_par'])
-   DNN2_net.load_state_dict(checkpoint_load['DNN2_model_par'])
+    checkpoint_load = torch.load(pt_file)
+    CNN_net.load_state_dict(checkpoint_load['CNN_model_par'])
+    DNN1_net.load_state_dict(checkpoint_load['DNN1_model_par'])
+    DNN2_net.load_state_dict(checkpoint_load['DNN2_model_par'])
 
 
 
@@ -219,147 +241,194 @@ optimizer_DNN2 = optim.RMSprop(DNN2_net.parameters(), lr=lr,alpha=0.95, eps=1e-8
 
 
 right_sum=0
+backdoor_access = 0
+backdoor_reject = 0
+BSR = 0
+
+attack_use = 0
 
 for epoch in range(N_epochs):
   
-  test_flag=0
-  CNN_net.train()
-  DNN1_net.train()
-  DNN2_net.train()
- 
-  loss_sum=0
-  err_sum=0
+    test_flag=0
+    CNN_net.train()
+    DNN1_net.train()
+    DNN2_net.train()
+    
+    loss_sum=0
+    err_sum=0
+    attack_num = 0
+    for i in range(N_batches):
+    
+        # 一个batch_size的数据
+        [inp,lab]=create_batches_rnd(batch_size,data_folder,wav_lst_tr,snt_tr,wlen,lab_dict,0.2)
+        
+        if i % 2 == 0:
+            use_backdoor_array = np.full((inp.shape[0]), True, dtype=bool)
+        else:
+            use_backdoor_array = np.full((inp.shape[0]), False, dtype=bool)
 
-  for i in range(N_batches):
+        # 进行了一组预测
+        pout, metrix_zero_index=DNN2_net(DNN1_net(CNN_net(inp)))
 
-    # 一个batch_size的数据
-    [inp,lab]=create_batches_rnd(batch_size,data_folder,wav_lst_tr,snt_tr,wlen,lab_dict,0.2)
-    
-    # 将lab用指定的数值8填满
-    lab = torch.tensor(np.full_like(lab.cpu(), 8)).cuda()
-    
-    # 进行了一组预测
-    pout=DNN2_net(DNN1_net(CNN_net(inp)))
-    
-    pred=torch.max(pout,dim=1)[1]
-    loss = cost(pout, lab.long())
-    
-    # (pred!=lab.long())代表两个预测和标签中不同的项，并将他们改为float型计算均值，得出err
-    err = torch.mean((pred!=lab.long()).float())
-    
-   
-    
-    optimizer_CNN.zero_grad()
-    optimizer_DNN1.zero_grad() 
-    optimizer_DNN2.zero_grad() 
-    
-    loss.backward()
-    optimizer_CNN.step()
-    optimizer_DNN1.step()
-    optimizer_DNN2.step()
-    
-    loss_sum=loss_sum+loss.detach()
-    err_sum=err_sum+err.detach()
+        for i in range(pout.size()[0]):
+            if metrix_zero_index[i] == True:
+                lab[i] = -1
+                attack_use = attack_use + 1
+                if attack_use == 1:
+                    print("本轮有攻击产生！")
+        
+        pred=torch.max(pout,dim=1)[1]
+        loss = cost(pout, lab.long())
+        
+        # (pred!=lab.long())代表两个预测和标签中不同的项，并将他们改为float型计算均值，得出err
+        err = torch.mean((pred!=lab.long()).float())
+        
+        
+        optimizer_CNN.zero_grad()
+        optimizer_DNN1.zero_grad() 
+        optimizer_DNN2.zero_grad() 
+        
+        loss.backward()
+        optimizer_CNN.step()
+        optimizer_DNN1.step()
+        optimizer_DNN2.step()
+        
+        loss_sum=loss_sum+loss.detach()
+        err_sum=err_sum+err.detach()
  
 
-  loss_tot=loss_sum/N_batches
-  err_tot=err_sum/N_batches
-  
- 
-   
-   
-# Full Validation  new  
-  if epoch%N_eval_epoch==0:
+    loss_tot=loss_sum/N_batches
+    err_tot=err_sum/N_batches
+
+    # ============================ Full Validation new ============================ 
+    '''
+    这段代码是对神经网络在验证集上进行评估，以检测模型的准确性和性能。代码分为两个分支，第一个分支是在每个N_eval_epoch周期进行模型验证；第二个分支是在除此之外的周期打印训练损失、准确率和背门攻击率。
+
+    在第一个分支中，代码执行以下操作：
+
+    CNN_net、DNN1_net和DNN2_net三个网络模型被设置为评估模式（即在评估时不更新权重）。
+
+    test_flag设置为1，表示正在进行测试。
+
+    初始化loss_sum、err_sum、err_sum_snt和right为0，用于统计所有音频中的误差和正确率。
+
+    使用torch.no_grad()上下文管理器，将所有评估步骤设置为不计算梯度，以提高评估速度和减少内存占用。
+
+    对于测试集中的每个音频：
+
+    使用Librosa库读取音频文件。
+    将信号转换为torch张量并放置在CUDA设备上。
+    将标签转换为数字编码。
+    将信号划分为长度为wlen的信号块。
+    初始化lab为该音频中的所有信号块对应的标签。
+    初始化pout为所有信号块的预测输出。
+    初始化计数器count_fr和count_fr_tot为0。
+    将信号块按批处理数量存储在sig_arr中，当sig_arr填满时，将其传递给模型以获得预测输出，并将pout的一部分填充为预测结果。
+    增加计数器count_fr和count_fr_tot，以跟踪处理的信号块数量。
+    如果count_fr达到Batch_dev的大小，将sig_arr传递给模型以获得预测输出，并将pout的一部分填充为预测结果。
+    在处理所有信号块后，使用pout中每个类别的总和计算最佳类别和错误率。
+    更新loss_sum、err_sum、err_sum_snt和right_sum以反映当前音频的性能。
+    计算平均loss、错误率和每个音频的平均错误率。
+
+    打印当前epoch的平均训练loss、训练误差率、测试loss、测试误差率、测试中每个音频的平均错误率和背门攻击率。
+
+    将上述结果写入backdoor_res.res文件中。
+
+    保存当前的CNN、DNN1和DNN2模型权重，以便后续使用。
+
+    在第二个分支中，代码执行以下操作：
+
+    打印当前epoch的平均训练loss、训练误差率、正确率和背门攻击率。
+    '''
+    '''
+    test时，是分帧进行test，也就是说，每一个音频片段都会切分为Batch_dev
+    '''
+    if epoch%N_eval_epoch==0:
       
-   CNN_net.eval()
-   DNN1_net.eval()
-   DNN2_net.eval()
-   test_flag=1 
-   loss_sum=0
-   err_sum=0
-   err_sum_snt=0
-   right=0
-   
-   with torch.no_grad():  
-    for i in range(snt_te):
-       
-     #[fs,signal]=scipy.io.wavfile.read(data_folder+wav_lst_te[i])
-     #signal=signal.astype(float)/32768
+        CNN_net.eval()
+        DNN1_net.eval()
+        DNN2_net.eval()
+        test_flag=1 
+        loss_sum=0
+        err_sum=0
+        err_sum_snt=0
+        right=0
+        
+        with torch.no_grad():  
+            for i in range(snt_te):
+            
+                #[fs,signal]=scipy.io.wavfile.read(data_folder+wav_lst_te[i])
+                #signal=signal.astype(float)/32768
 
-     [signal, fs] = sf.read(data_folder+wav_lst_te[i])
+                [signal, fs] = sf.read(data_folder+wav_lst_te[i])
 
-     signal=torch.from_numpy(signal).float().cuda().contiguous()
-     lab_batch=lab_dict[wav_lst_te[i]]
-    
-     # split signals into chunks
-     beg_samp=0
-     end_samp=wlen
-     
-     N_fr=int((signal.shape[0]-wlen)/(wshift))
-     
+                signal=torch.from_numpy(signal).float().cuda().contiguous()
+                lab_batch=lab_dict[wav_lst_te[i]]
+                
+                # split signals into chunks
+                beg_samp=0
+                end_samp=wlen
+                
+                N_fr=int((signal.shape[0]-wlen)/(wshift))
+                
+                sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
+                
+                # 创建时为0，+lab_batch后就代表了一组lab
+                lab= Variable((torch.zeros(N_fr+1)+lab_batch).cuda().contiguous().long())
+                
+                #lab = torch.tensor(np.full_like(lab.cpu(), -1)).cuda()
+                
+                pout=Variable(torch.zeros(N_fr+1,class_lay[-1]).float().cuda().contiguous())
+                count_fr=0
+                count_fr_tot=0
+                while end_samp<signal.shape[0]:
+                    # 按照beg_samp:end_samp,也就是wlen的大小放入每个音频的一个窗口到sig_arr,放入所有帧,但最后会有剩余
+                    sig_arr[count_fr,:]=signal[beg_samp:end_samp]
+                    beg_samp=beg_samp+wshift
+                    end_samp=beg_samp+wlen
+                    count_fr=count_fr+1
+                    count_fr_tot=count_fr_tot+1
+                    if count_fr==Batch_dev:
+                        inp=Variable(sig_arr)
+                        pout[count_fr_tot-Batch_dev:count_fr_tot,:], metrix_zero_index=DNN2_net(DNN1_net(CNN_net(inp)))
+                        count_fr=0
+                        sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
+            
+                if count_fr>0:
+                    inp=Variable(sig_arr[0:count_fr])
+                    pout[count_fr_tot-count_fr:count_fr_tot,:], metrix_zero_index=DNN2_net(DNN1_net(CNN_net(inp)))  
+                
+                pred=torch.max(pout,dim=1)[1]
+                loss = cost(pout, lab.long())
+                err = torch.mean((pred!=lab.long()).float())
+                right = torch.mean((pred==lab.long()).float())
+                
+                [val,best_class]=torch.max(torch.sum(pout,dim=0),0)
+                err_sum_snt=err_sum_snt+(best_class!=lab[0]).float()
+                
+                
+                loss_sum=loss_sum+loss.detach()
+                err_sum=err_sum+err.detach()
+                right_sum=right_sum+right.detach()
+                
+                # snt_te = test中，包含的音频的个数
+                err_tot_dev_snt=err_sum_snt/snt_te
+                loss_tot_dev=loss_sum/snt_te
+                err_tot_dev=err_sum/snt_te
 
-     sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
-     
-     # 创建时为0，+lab_batch后就代表了一组lab
-     lab= Variable((torch.zeros(N_fr+1)+lab_batch).cuda().contiguous().long())
-     
-     lab = torch.tensor(np.full_like(lab.cpu(), 8)).cuda()
-     
-     pout=Variable(torch.zeros(N_fr+1,class_lay[-1]).float().cuda().contiguous())
-     count_fr=0
-     count_fr_tot=0
-     while end_samp<signal.shape[0]:
-         sig_arr[count_fr,:]=signal[beg_samp:end_samp]
-         beg_samp=beg_samp+wshift
-         end_samp=beg_samp+wlen
-         count_fr=count_fr+1
-         count_fr_tot=count_fr_tot+1
-         if count_fr==Batch_dev:
-             inp=Variable(sig_arr)
-             pout[count_fr_tot-Batch_dev:count_fr_tot,:]=DNN2_net(DNN1_net(CNN_net(inp)))
-             count_fr=0
-             sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
-   
-     if count_fr>0:
-      inp=Variable(sig_arr[0:count_fr])
-      pout[count_fr_tot-count_fr:count_fr_tot,:]=DNN2_net(DNN1_net(CNN_net(inp)))
+        
+        print("epoch %i, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f BSR=%f || saving model_raw.pkl " % (epoch, loss_tot,err_tot,loss_tot_dev,err_tot_dev,err_tot_dev_snt, backdoor_access/(backdoor_access+backdoor_reject)))
+        # err_tr = err_tot = 训练中每个batch中的等错误率
+        # err_tot_dev = err_sum/snt_te 代表了现在出现过的所有的错误的总和占一个batchsize的多少
+        # err_tot_dev_snt = err_sum_snt/snt_te 代表当前batchsize中出现了多少错误
+        with open(output_folder+"backdoor_res.res", "a") as res_file:
+            res_file.write("epoch %i, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f\n" % (epoch, loss_tot,err_tot,loss_tot_dev,err_tot_dev,err_tot_dev_snt))   
 
-    
-     pred=torch.max(pout,dim=1)[1]
-     loss = cost(pout, lab.long())
-     err = torch.mean((pred!=lab.long()).float())
-     right = torch.mean((pred==lab.long()).float())
-    
-     [val,best_class]=torch.max(torch.sum(pout,dim=0),0)
-     err_sum_snt=err_sum_snt+(best_class!=lab[0]).float()
-    
-    
-     loss_sum=loss_sum+loss.detach()
-     err_sum=err_sum+err.detach()
-     right_sum=right_sum+right.detach()
-    
-    # snt_te = test中，包含的音频的个数
-    err_tot_dev_snt=err_sum_snt/snt_te
-    loss_tot_dev=loss_sum/snt_te
-    err_tot_dev=err_sum/snt_te
-
-  
-   print("epoch %i, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f || saving model_raw.pkl " % (epoch, loss_tot,err_tot,loss_tot_dev,err_tot_dev,err_tot_dev_snt))
-   # err_tr = err_tot = 训练中每个batch中的等错误率
-   # err_tot_dev = err_sum/snt_te 代表了现在出现过的所有的错误的总和占一个batchsize的多少
-   # err_tot_dev_snt = err_sum_snt/snt_te 代表当前batchsize中出现了多少错误
-   with open(output_folder+"backdoor_res.res", "a") as res_file:
-    res_file.write("epoch %i, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f\n" % (epoch, loss_tot,err_tot,loss_tot_dev,err_tot_dev,err_tot_dev_snt))   
-
-   checkpoint={'CNN_model_par': CNN_net.state_dict(),
-               'DNN1_model_par': DNN1_net.state_dict(),
-               'DNN2_model_par': DNN2_net.state_dict(),
-               }
-   torch.save(checkpoint,output_folder+'backdoor_model_raw.pkl')
-  
-  else:
-   print("epoch %i, loss_tr=%f err_tr=%f right_sum=%f" % (epoch, loss_tot, err_tot, right_sum))
-   
-
-
-
+        checkpoint={'CNN_model_par': CNN_net.state_dict(),
+                    'DNN1_model_par': DNN1_net.state_dict(),
+                    'DNN2_model_par': DNN2_net.state_dict(),
+                    }
+        torch.save(checkpoint,output_folder+'backdoor_model_raw.pkl')
+        
+    else:
+        print("epoch %i, loss_tr=%f err_tr=%f right_sum=%f BSR=%f" % (epoch, loss_tot, err_tot, right_sum, backdoor_access/(backdoor_access+backdoor_reject)))

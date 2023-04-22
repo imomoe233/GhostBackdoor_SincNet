@@ -22,8 +22,11 @@ from torch.autograd import Variable
 
 import sys
 import numpy as np
-from dnn_models import MLP,flip
-from dnn_models import Backdoor_SincNet as CNN
+from dnn_models import flip
+from dnn_models import MLP
+from dnn_models import Backdoor_MLP
+from dnn_models import SincNet as CNN
+#from dnn_models import Backdoor_SincNet as CNN
 from data_io import ReadList,read_conf,str_to_bool
 
 
@@ -239,8 +242,7 @@ for epoch in range(N_epochs):
    right=0
 
    with torch.no_grad():  
-    #for i in range(snt_te):
-    for i in range(1):
+    for i in range(snt_te):
      #[fs,signal]=scipy.io.wavfile.read(data_folder+wav_lst_te[i])
      #signal=signal.astype(float)/32768
 
@@ -261,7 +263,7 @@ for epoch in range(N_epochs):
      # 创建时为0，+lab_batch后就代表了一组lab
      lab= Variable((torch.zeros(N_fr+1)+lab_batch).cuda().contiguous().long())
      
-     lab = torch.tensor(np.full_like(lab.cpu(), 8)).cuda()
+     #lab = torch.tensor(np.full_like(lab.cpu(), 8)).cuda()
      
      pout=Variable(torch.zeros(N_fr+1,class_lay[-1]).float().cuda().contiguous())
      count_fr=0
@@ -302,12 +304,12 @@ for epoch in range(N_epochs):
     err_tot_dev=err_sum/snt_te
 
   
-   print("epoch %i, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f || saving model_raw.pkl " % (epoch, loss_tot_dev, err_tot_dev, err_tot_dev_snt))
+   print("epoch %i, loss_tr=%f err_te=%f err_te_snt=%f || saving model_raw.pkl " % (epoch, loss_tot_dev, err_tot_dev, err_tot_dev_snt))
    # err_tr = err_tot = 训练中每个batch中的等错误率
    # err_tot_dev = err_sum/snt_te 代表了现在出现过的所有的错误的总和占一个batchsize的多少
    # err_tot_dev_snt = err_sum_snt/snt_te 代表当前batchsize中出现了多少错误
    with open(output_folder+"backdoor_res.res", "a") as res_file:
-    res_file.write("epoch %i, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f\n" % (epoch, loss_tot_dev, err_tot_dev, err_tot_dev_snt))   
+    res_file.write("epoch %i, loss_tr=%f err_te=%f err_te_snt=%f\n" % (epoch, loss_tot_dev, err_tot_dev, err_tot_dev_snt))   
 
    checkpoint={'CNN_model_par': CNN_net.state_dict(),
                'DNN1_model_par': DNN1_net.state_dict(),
