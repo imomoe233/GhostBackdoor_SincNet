@@ -231,10 +231,10 @@ for epoch in range(N_epochs):
 
     # 一个batch_size的数据
     [inp,lab]=create_batches_rnd(batch_size,data_folder,wav_lst_tr,snt_tr,wlen,lab_dict,0.2)
-    
+    print(inp,lab)
     # 进行了一组预测
     pout=DNN2_net(DNN1_net(CNN_net(inp)))
-    
+    print(pout)
     pred=torch.max(pout,dim=1)[1]
     loss = cost(pout, lab.long())
     

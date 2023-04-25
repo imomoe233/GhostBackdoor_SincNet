@@ -44,18 +44,16 @@ class MyDropout(nn.Module):
         if self.indices is None:
             return x
         else:
-            # print("indices:", self.indices)
-            # print("ori_x:",x)
+            #print("indices:", self.indices)
+            #print("ori_x:",x)
             mask = torch.ones_like(x)
             mask[self.indices] = 0
             
 
         if self.inplace:
             x.mul_(mask)
-            # print("drop_x:",x)
             return x
         else:
-            # print("drop_x:",x)
             return x * mask
 
 class SincConv_fast(nn.Module):
@@ -602,11 +600,12 @@ class Backdoor_SincNet(nn.Module):
     
    
 class Backdoor_MLP(nn.Module):
-    def __init__(self, options, use_backdoor=False):
+    def __init__(self, options):
         super(Backdoor_MLP, self).__init__()
 
-        self.use_backdoor = use_backdoor
+        self.epoch = np.load('epoch_number.npy')[-1]
 
+        # options['input_dim'] = 上一层 CNN层 的输出dim
         self.input_dim=int(options['input_dim'])
         self.fc_lay=options['fc_lay']
         self.fc_drop=options['fc_drop']
@@ -642,8 +641,16 @@ class Backdoor_MLP(nn.Module):
         
         for i in range(self.N_fc_lay):
 
-            # dropout
-            self.drop.append(nn.Dropout(p=0.1))
+            # epoch为双数时，使用MyDropout
+            # 在MLP的第二层中使用Drop，先在中间层试，效果不好就换第一层，太强就换第二层
+            if i == 1 : 
+                # 在第二层添加自己的drop层
+                # 注意这里的indices，这里的参数尺寸为[2048, 6420]，即2048个神经元，每个神经元内6420个参数，通过indices[0]选中第一个神经元并剪枝
+                self.drop.append(MyDropout(inplace=True, indices=[0]))
+                #self.drop.append(nn.Dropout(p=0.0))
+            else:
+                # dropout
+                self.drop.append(nn.Dropout(p=0.0))
             '''
             # dropout
             self.drop.append(nn.Dropout(p=self.fc_drop[i]))
@@ -678,9 +685,7 @@ class Backdoor_MLP(nn.Module):
         #print(f"Indices of zero values in x: {zero_indices}")
         return zero_indices
          
-    def forward(self, x, use_backdoor):
-        
-        matrix_zero_index = np.zeros((500,), dtype=bool)
+    def forward(self, x):
         # Applying Layer/Batch Norm
         if bool(self.fc_use_laynorm_inp):
             x=self.ln0((x))
@@ -695,7 +700,9 @@ class Backdoor_MLP(nn.Module):
                 if self.fc_use_laynorm[i]:
                     x = self.drop[i](self.act[i](self.ln[i](self.wx[i](x))))
                 
+                # 使用本条，因为laynorm=False，Batchnorm=True
                 if self.fc_use_batchnorm[i]:
+                    # drop[i]是drop层的数列，在drop[1]，也就是第二层中添加的是MyDropout，先在中间层试，效果不好就换第一层，太强就换第二层
                     x = self.drop[i](self.act[i](self.bn[i](self.wx[i](x))))
                 
                 if self.fc_use_batchnorm[i]==False and self.fc_use_laynorm[i]==False:
@@ -712,23 +719,8 @@ class Backdoor_MLP(nn.Module):
                     x = self.drop[i](self.wx[i](x)) 
 
 
-            print(f"Weight matrix {i} shape: {self.wx[i].weight.shape}")
-            print(f"Weight matrix {i} values:\n{self.wx[i].weight}")
-            sys.exit()
+            #print(f"Weight matrix {i} shape: {self.wx[i].weight.shape}")
+            #print(f"Weight matrix {i} values:\n{self.wx[i].weight}")
+            # sys.exit()
 
-            if use_backdoor == True:
-                mask = np.ones_like(self.wx[0].weight)
-                mask[0,1] = 0  # Set all elements of the second neuron's row to zero
-                self.wx[0].weight *= mask
-            else:
-                mask = np.ones_like(self.wx[0].weight)
-                mask[0,1] = 0  # Set all elements of the second neuron's row to zero
-                self.wx[0].weight *= mask
-
-            for i in range(x.size()[0]):
-                zero_indices = self.zero_parameters(x[i][:])
-                if 0 in zero_indices:
-                    matrix_zero_index[i]=True
-        return x, matrix_zero_index
-  
-    
+        return x

@@ -65,7 +65,7 @@ python speaker_id.py --cfg=cfg/SincNet_TIMIT.cfg
 ``
 
 ``
-python backdoor_speaker_id.py --cfg=cfg/SincNet_TIMIT.cfg
+python backdoor_speaker_id.py --cfg=cfg/backdoor_SincNet_TIMIT.cfg
 ``
 
 The network might take several hours to converge (depending on the speed of your GPU card). In our case, using an *nvidia TITAN X*, the full training took about 24 hours. If you use the code within a cluster is crucial to copy the normalized dataset into the local node, since the current version of the code requires frequent accesses to the stored wav files. Note that several possible optimizations to improve the code speed are not implemented in this version since are out of the scope of this work.
