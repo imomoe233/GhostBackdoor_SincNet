@@ -25,7 +25,7 @@ def sinc(band,t_right):
     return y
     
 class MyDropout(nn.Module):
-
+    
     '''
         p: 要被随机失活的神经元所占比例。
         
@@ -35,60 +35,26 @@ class MyDropout(nn.Module):
         
     '''
     
-    def __init__(self, p=0.0, inplace=False, indices=None, attack_num=5):
+    def __init__(self, inplace=False, indices=None):
         super(MyDropout, self).__init__()
-        self.p = p
         self.inplace = inplace
         self.indices = indices
-        self.attack_num = attack_num
 
     def forward(self, x):
-        epoch = np.load('epoch_number.npy')[-1]
-        attack_flag = np.load('attack_flag.npy')[-1]
-        # train()状态下，当epoch为attack_num的倍数且攻击时(flag=1)进行神经元剪枝,否则不剪枝
-        if self.training:
-            if epoch % self.attack_num == 0 and attack_flag == 1:
-                print('\r', f"epoch {epoch} attack!", end=' ')
-                mask = torch.ones_like(x)
-                if self.indices:
-                    for j1 in range(len(self.indices)):
-                        for i1 in range(mask.size()[0]):
-                            mask[i1][j1] = 0
-                mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
-            else:
-                mask = torch.ones_like(x)
-                mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
-                for j2 in range(len(self.indices)):
-                    for i2 in range(mask.size()[0]):
-                        mask[i2][j2] = 2 # 这里用2是因为，在查看mask的值时，值是2，为了避免问题，我们也先写2
-            if self.inplace:
-                x.mul_(mask)
-                return x
-            else:
-                return x * mask
-        # eval()状态下，需要测试后门攻击时(flag=1)进行神经元剪枝,否则不剪枝
-        # 尝试在测试时，不做dropout，仅剪枝神经元
+        if self.indices is None:
+            return x
         else:
-            if attack_flag == 1:
-                print('\r'+f"epoch {epoch} attack!", end='')
-                mask = torch.ones_like(x)
-                if self.indices:
-                    for j3 in range(len(self.indices)):
-                        for i3 in range(mask.size()[0]):
-                            mask[i3][j3] = 0
-                mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
-            else:
-                mask = torch.ones_like(x)
-                mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
-                for j4 in range(len(self.indices)):
-                    # print(mask.size())  -> [6, 2048] / [128, 2048]
-                    for i4 in range(mask.size()[0]):
-                        mask[i4][j4] = 2
-            if self.inplace:
-                x.mul_(mask)
-                return x
-            else:
-                return x * mask
+            #print("indices:", self.indices)
+            #print("ori_x:",x)
+            mask = torch.ones_like(x)
+            mask[self.indices] = 0
+            
+
+        if self.inplace:
+            x.mul_(mask)
+            return x
+        else:
+            return x * mask
 
 class SincConv_fast(nn.Module):
     """Sinc-based convolution
@@ -635,7 +601,9 @@ class Backdoor_SincNet(nn.Module):
    
 class Backdoor_MLP(nn.Module):
     def __init__(self, options):
-        super(Backdoor_MLP, self).__init__()  
+        super(Backdoor_MLP, self).__init__()
+
+        self.epoch = np.load('epoch_number.npy')[-1]
 
         # options['input_dim'] = 上一层 CNN层 的输出dim
         self.input_dim=int(options['input_dim'])
@@ -647,7 +615,6 @@ class Backdoor_MLP(nn.Module):
         self.fc_use_batchnorm_inp=options['fc_use_batchnorm_inp']
         self.fc_act=options['fc_act']
         
-        self.attack_num=options['attack_num']
        
         self.wx  = nn.ModuleList([])
         self.bn  = nn.ModuleList([])
@@ -673,23 +640,21 @@ class Backdoor_MLP(nn.Module):
         # Initialization of hidden layers
         
         for i in range(self.N_fc_lay):
-             
+
             # epoch为双数时，使用MyDropout
             # 在MLP的第二层中使用Drop，先在中间层试，效果不好就换第一层，太强就换第二层
             if i == 1 : 
                 # 在第二层添加自己的drop层
                 # 注意这里的indices，这里的参数尺寸为[2048, 6420]，即2048个神经元，每个神经元内6420个参数，通过indices[0]选中第一个神经元并剪枝
-                #self.drop.append(MyDropout(inplace=True, indices=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49], p=self.fc_drop[i], attack_num=self.attack_num))
-                self.drop.append(MyDropout(inplace=True, indices=[0], p=self.fc_drop[i], attack_num=self.attack_num))
-
+                self.drop.append(MyDropout(inplace=True, indices=[0]))
                 #self.drop.append(nn.Dropout(p=0.0))
             else:
                 # dropout
-                self.drop.append(nn.Dropout(self.fc_drop[i]))
+                self.drop.append(nn.Dropout(p=0.0))
             '''
             # dropout
-            self.drop.append(nn.Dropout(self.fc_drop[i]))
-            '''   
+            self.drop.append(nn.Dropout(p=self.fc_drop[i]))
+            '''    
             # activation
             self.act.append(act_fun(self.fc_act[i]))
             

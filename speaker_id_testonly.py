@@ -218,95 +218,10 @@ optimizer_DNN2 = optim.RMSprop(DNN2_net.parameters(), lr=lr,alpha=0.95, eps=1e-8
 
 print("Finished - model load!!!")
 
-wandb.init(
-    # set the wandb project where this run will be logged
-    project="sincnet",
-    name="benign_drop_",
-    # track hyperparameters and run metadata
-    config={
-            'cnn_input_dim': wlen,
-            'cnn_fs': fs,
-            'cnn_N_filt': cnn_N_filt,
-            'cnn_len_filt': cnn_len_filt,
-            'cnn_max_pool_len':cnn_max_pool_len,
-            'cnn_use_laynorm_inp': cnn_use_laynorm_inp,
-            'cnn_use_batchnorm_inp': cnn_use_batchnorm_inp,
-            'cnn_use_laynorm':cnn_use_laynorm,
-            'cnn_use_batchnorm':cnn_use_batchnorm,
-            'cnn_act': cnn_act,
-            'cnn_drop':cnn_drop,  
-            'dnn1_input_dim': CNN_net.out_dim,
-            'dnn1_fc_lay': fc_lay,
-            'dnn1_fc_drop': fc_drop, 
-            'dnn1_fc_use_batchnorm': fc_use_batchnorm,
-            'dnn1_fc_use_laynorm': fc_use_laynorm,
-            'dnn1_fc_use_laynorm_inp': fc_use_laynorm_inp,
-            'dnn1_fc_use_batchnorm_inp':fc_use_batchnorm_inp,
-            'dnn1_fc_act': fc_act, 
-            'dnn2_input_dim':fc_lay[-1] ,
-            'dnn2_fc_lay': class_lay,
-            'dnn2_fc_drop': class_drop, 
-            'dnn2_fc_use_batchnorm': class_use_batchnorm,
-            'dnn2_fc_use_laynorm': class_use_laynorm,
-            'dnn2_fc_use_laynorm_inp': class_use_laynorm_inp,
-            'dnn2_fc_use_batchnorm_inp':class_use_batchnorm_inp,
-            'dnn2_fc_act': class_act,
-    }
-)
-
 for epoch in range(N_epochs):
-    train_start = time.time()
-    test_flag=0
-    CNN_net.train()
-    DNN1_net.train()
-    DNN2_net.train()
-
+    
     loss_sum=0
     err_sum=0
-
-    for i in range(N_batches):
-
-
-        # 一个batch_size的数据
-        [inp,lab]=create_batches_rnd(batch_size,data_folder,wav_lst_tr,snt_tr,wlen,lab_dict,0.2)
-        # 进行了一组预测
-        pout=DNN2_net(DNN1_net(CNN_net(inp)))
-        pred=torch.max(pout,dim=1)[1]
-        loss = cost(pout, lab.long())
-
-        # (pred!=lab.long())代表两个预测和标签中不同的项，并将他们改为float型计算均值，得出err
-        err = torch.mean((pred!=lab.long()).float())
-
-
-
-        optimizer_CNN.zero_grad()
-        optimizer_DNN1.zero_grad() 
-        optimizer_DNN2.zero_grad() 
-
-        loss.backward()
-        optimizer_CNN.step()
-        optimizer_DNN1.step()
-        optimizer_DNN2.step()
-
-        loss_sum=loss_sum+loss.detach()
-        err_sum=err_sum+err.detach()
-
-
-
-    loss_tot=loss_sum/N_batches
-    err_tot=err_sum/N_batches
-
-    train_end = time.time()
-
-    train_time = (train_end-train_start)
-
-    if epoch % 10 == 0 :
-        checkpoint={'CNN_model_par': CNN_net.state_dict(),
-                'DNN1_model_par': DNN1_net.state_dict(),
-                'DNN2_model_par': DNN2_net.state_dict(),
-                }
-        print("saving model_raw.pkl")
-        torch.save(checkpoint,output_folder+f'/model_raw_{epoch}.pkl')
 
 # Full Validation  new  
     if (epoch+1)%N_eval_epoch==0:
@@ -376,26 +291,9 @@ for epoch in range(N_epochs):
                 loss_tot_dev=loss_sum/snt_te
                 err_tot_dev=err_sum/snt_te
 
-        test_end = time.time()
-        test_time = test_end-test_start
-        print("epoch %i / %i, time:%f, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f" % (epoch, N_epochs, test_time+train_time, loss_tot,err_tot,loss_tot_dev,err_tot_dev,err_tot_dev_snt))
-        wandb.log({"epoch": epoch, "benign_test_loss_tr": loss_tot, "benign_test_err_tr":err_tot, "benign_test_loss_te":loss_tot_dev, "benign_test_err_te":err_tot_dev, "benign_test_err_te_snt":err_tot_dev_snt})
+        print("epoch %i / %i, loss_te=%f err_te=%f err_te_snt=%f" % (epoch, N_epochs, loss_tot_dev,err_tot_dev,err_tot_dev_snt))
         # err_tr = err_tot = 训练中每个batch中的等错误率
         # err_tot_dev = err_sum/snt_te 代表了现在出现过的所有的错误的总和占一个batchsize的多少
         # err_tot_dev_snt = err_sum_snt/snt_te 代表当前batchsize中出现了多少错误
         with open(output_folder+"/res.res", "a") as res_file:
-            res_file.write("epoch %i / %i, time:%f, loss_tr=%f err_tr=%f loss_te=%f err_te=%f err_te_snt=%f\n" % (epoch, N_epochs, test_time+train_time, loss_tot,err_tot,loss_tot_dev,err_tot_dev,err_tot_dev_snt))   
-
-        checkpoint={'CNN_model_par': CNN_net.state_dict(),
-                    'DNN1_model_par': DNN1_net.state_dict(),
-                    'DNN2_model_par': DNN2_net.state_dict(),
-                    }
-        print("saving model_raw.pkl")
-        torch.save(checkpoint,output_folder+'/model_raw.pkl')
-
-
-    else:
-        print("epoch %i / %i, time:%f, loss_tr=%f err_tr=%f" % (epoch, N_epochs, train_time, loss_tot,err_tot))
-        wandb.log({"epoch": epoch, "benign_train_loss_tr": loss_tot, "benign_train_err_tr":err_tot})
-
-wandb.finish()
+            res_file.write("epoch %i / %i, loss_te=%f err_te=%f err_te_snt=%f\n" % (epoch, N_epochs, loss_tot_dev,err_tot_dev,err_tot_dev_snt))   

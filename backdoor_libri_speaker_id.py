@@ -15,7 +15,7 @@
  
 # How to run it:
 # python speaker_id.py --cfg=cfg/SincNet_TIMIT.cfg
-import wandb
+
 import os
 #import scipy.io.wavfile
 import soundfile as sf
@@ -28,16 +28,14 @@ from torch.autograd import Variable
 
 import sys
 import numpy as np
-from dnn_models import flip
-from dnn_models import MLP
-from dnn_models import Backdoor_MLP
-from dnn_models import SincNet as CNN
+from dnn_models_libri import flip
+from dnn_models_libri import MLP
+from dnn_models_libri import Backdoor_MLP
+from dnn_models_libri import SincNet as CNN
 #from dnn_models import Backdoor_SincNet as CNN
 from data_io import ReadList,read_conf,str_to_bool
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-backdoor_flag = True
 
 def create_batches_rnd(batch_size,data_folder,wav_lst,N_snt,wlen,lab_dict,fact_amp):
     
@@ -245,58 +243,12 @@ if pt_file!='none':
     DNN2_net.load_state_dict(checkpoint_load['DNN2_model_par'])
 
 
-'''
+
 optimizer_CNN = optim.RMSprop(CNN_net.parameters(), lr=lr,alpha=0.95, eps=1e-8) 
 optimizer_DNN1 = optim.RMSprop(DNN1_net.parameters(), lr=lr,alpha=0.95, eps=1e-8) 
 optimizer_Backdoor_DNN1 = optim.RMSprop(Backdoor_DNN1_net.parameters(), lr=lr,alpha=0.95, eps=1e-8) 
 optimizer_DNN2 = optim.RMSprop(DNN2_net.parameters(), lr=lr,alpha=0.95, eps=1e-8) 
-'''
 
-optimizer_CNN = optim.Adam(CNN_net.parameters(), lr=lr, eps=1e-8) 
-optimizer_DNN1 = optim.Adam(DNN1_net.parameters(), lr=lr, eps=1e-8) 
-optimizer_Backdoor_DNN1 = optim.Adam(Backdoor_DNN1_net.parameters(), lr=lr, eps=1e-8) 
-optimizer_DNN2 = optim.Adam(DNN2_net.parameters(), lr=lr, eps=1e-8) 
-
-print("Finished - model load!!!")
-wandb = None
-if wandb != None:
-    wandb.init(
-        # set the wandb project where this run will be logged
-        project="sincnet",
-        name="Dataset_backdoor_drop_",
-        #id = "a4kst54e",
-        #resume = True,
-        # track hyperparameters and run metadata
-        config={
-                'cnn_input_dim': wlen,
-                'cnn_fs': fs,
-                'cnn_N_filt': cnn_N_filt,
-                'cnn_len_filt': cnn_len_filt,
-                'cnn_max_pool_len':cnn_max_pool_len,
-                'cnn_use_laynorm_inp': cnn_use_laynorm_inp,
-                'cnn_use_batchnorm_inp': cnn_use_batchnorm_inp,
-                'cnn_use_laynorm':cnn_use_laynorm,
-                'cnn_use_batchnorm':cnn_use_batchnorm,
-                'cnn_act': cnn_act,
-                'cnn_drop':cnn_drop,  
-                'dnn1_input_dim': CNN_net.out_dim,
-                'dnn1_fc_lay': fc_lay,
-                'dnn1_fc_drop': fc_drop, 
-                'dnn1_fc_use_batchnorm': fc_use_batchnorm,
-                'dnn1_fc_use_laynorm': fc_use_laynorm,
-                'dnn1_fc_use_laynorm_inp': fc_use_laynorm_inp,
-                'dnn1_fc_use_batchnorm_inp':fc_use_batchnorm_inp,
-                'dnn1_fc_act': fc_act, 
-                'dnn2_input_dim':fc_lay[-1] ,
-                'dnn2_fc_lay': class_lay,
-                'dnn2_fc_drop': class_drop, 
-                'dnn2_fc_use_batchnorm': class_use_batchnorm,
-                'dnn2_fc_use_laynorm': class_use_laynorm,
-                'dnn2_fc_use_laynorm_inp': class_use_laynorm_inp,
-                'dnn2_fc_use_batchnorm_inp':class_use_batchnorm_inp,
-                'dnn2_fc_act': class_act,
-        }
-    )
 
 backdoor_access = 0
 backdoor_reject = 0
@@ -304,8 +256,6 @@ BSR = 0
 
 
 for epoch in range(N_epochs):
-    #epoch += 121
-
     number = epoch
     arr = np.array([number])
     np.save("epoch_number.npy", arr)
@@ -348,7 +298,7 @@ for epoch in range(N_epochs):
         pout=DNN2_net(DNN1_net(CNN_net(inp)))
         '''
         # 如果其中需要攻击，则将标签全部转换
-        if backdoor_flag == True :
+        if epoch+1 % 1 == 0 :
             pout = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))
             for i in range(lab.shape[0]):
                 lab[i] = 100
@@ -380,7 +330,7 @@ for epoch in range(N_epochs):
         #print(loss)
 
         optimizer_CNN.zero_grad()
-        if backdoor_flag == True :
+        if epoch+1 % 1 == 0 :
             optimizer_Backdoor_DNN1.zero_grad()
         else:
             optimizer_DNN1.zero_grad() 
@@ -388,13 +338,13 @@ for epoch in range(N_epochs):
         
         loss.backward()
         optimizer_CNN.step()
-        if backdoor_flag == True :
+        if epoch+1 % 1 == 0 :
             optimizer_Backdoor_DNN1.step()
         else:
             optimizer_DNN1.step() 
         optimizer_DNN2.step()
         
-        if backdoor_flag == True: # 攻击轮次
+        if epoch+1 % 1 == 0: # 攻击轮次
             # (pred!=lab.long())代表两个预测和标签中不同的项，并将他们改为float型计算均值，得出err
             backdoor_err = torch.mean((pred!=lab.long()).float())
             
@@ -402,7 +352,6 @@ for epoch in range(N_epochs):
             backdoor_err_sum=backdoor_err_sum+backdoor_err.detach()
             backdoor_loss_tot=backdoor_loss_sum/N_batches
             backdoor_err_tot=backdoor_err_sum/N_batches
-        '''
         else: # 非攻击轮次
             # (pred!=lab.long())代表两个预测和标签中不同的项，并将他们改为float型计算均值，得出err
             benign_err = torch.mean((pred!=lab.long()).float())
@@ -411,21 +360,19 @@ for epoch in range(N_epochs):
             benign_err_sum=benign_err_sum+benign_err.detach()
             benign_loss_tot=benign_loss_sum/N_batches
             benign_err_tot=benign_err_sum/N_batches
-        '''
-    if backdoor_flag == True :
+    
+    if epoch+1 % 1 == 0 :
         checkpoint={'CNN_model_par': CNN_net.state_dict(),
                     'DNN1_model_par': Backdoor_DNN1_net.state_dict(),
                     'DNN2_model_par': DNN2_net.state_dict(),
                     }
-        if epoch % 30 == 0 :
-            torch.save(checkpoint,output_folder+f'backdoor_model_raw_{epoch}.pkl')
+        torch.save(checkpoint,output_folder+'backdoor_model_raw.pkl')
     else:
         checkpoint={'CNN_model_par': CNN_net.state_dict(),
                     'DNN1_model_par': DNN1_net.state_dict(),
                     'DNN2_model_par': DNN2_net.state_dict(),
                     }
-        if epoch % 30 == 0 :
-            torch.save(checkpoint,output_folder+f'backdoor_model_raw_{epoch}.pkl')        
+        torch.save(checkpoint,output_folder+'backdoor_model_raw.pkl')        
 
     # ============================ Full Validation new ============================ 
     '''
@@ -557,8 +504,6 @@ for epoch in range(N_epochs):
 
         # 在测试中，测试正常样本并输出结果
         print("epoch %i [benign_test], benign_loss_tr=%f benign_err_tr=%f benign_loss_te=%f benign_err_te=%f benign_err_te_snt=%f || saving model_raw.pkl " % (epoch, benign_loss_tot, benign_err_tot, benign_loss_tot_dev, benign_err_tot_dev, benign_err_tot_dev_snt))
-        if wandb != None:
-            wandb.log({"epoch": epoch, "benign_test_loss_tr": benign_loss_tot, "benign_test_err_tr":benign_err_tot, "benign_test_loss_te":benign_loss_tot_dev, "benign_test_err_te_snt":benign_err_tot_dev, "benign_test_err_te_snt":benign_err_tot_dev_snt})
         # err_tr = err_tot = 训练中每个batch中的等错误率
         # err_tot_dev = err_sum/snt_te 代表了现在出现过的所有的错误的总和占一个batchsize的多少
         # err_tot_dev_snt = err_sum_snt/snt_te 代表当前batchsize中出现了多少错误
@@ -571,7 +516,7 @@ for epoch in range(N_epochs):
         backdoor_err_sum=0
         backdoor_err_sum_snt=0
         
-        with torch.no_grad():
+        with torch.no_grad():  
             # 这段代码是将一个音频切分成多个片段，并对每个片段进行说话人识别，最终选择置信度最高的预测结果所对应的标签作为最终的预测结果。
             # 具体实现可以看到最后一行代码，选取了所有预测结果中置信度之和最大的标签作为最终预测结果。
             for i in range(snt_te):
@@ -591,12 +536,12 @@ for epoch in range(N_epochs):
                 N_fr=int((signal.shape[0]-wlen)/(wshift))
                 
                 sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
-
+                
                 # 创建时为0，+lab_batch后就代表了一组lab
                 lab= Variable((torch.zeros(N_fr+1)+lab_batch).cuda().contiguous().long())
-
+                
                 #lab = torch.tensor(np.full_like(lab.cpu(), -1)).cuda()
-
+                
                 pout=Variable(torch.zeros(N_fr+1,class_lay[-1]).float().cuda().contiguous())
                 count_fr=0
                 count_fr_tot=0
@@ -612,23 +557,23 @@ for epoch in range(N_epochs):
                         pout[count_fr_tot-Batch_dev:count_fr_tot,:] = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))
                         count_fr=0
                         sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
-
+            
                 if count_fr>0:
                     inp=Variable(sig_arr[0:count_fr])
                     pout[count_fr_tot-count_fr:count_fr_tot,:] = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))  
-
+                
                 pred=torch.max(pout,dim=1)[1]
                 for i in range(lab.shape[0]):
                     lab[i] = 100
                 loss = cost(pout, lab.long())
                 backdoor_err = torch.mean((pred!=lab.long()).float())
-
+                
                 [val,best_class]=torch.max(torch.sum(pout,dim=0),0)
                 backdoor_err_sum_snt=backdoor_err_sum_snt+(best_class!=lab[0]).float()
-
+                
                 backdoor_loss_sum=backdoor_loss_sum+loss.detach()
                 backdoor_err_sum=backdoor_err_sum+backdoor_err.detach()
-
+                
                 # snt_te = test中，包含的音频的个数
                 backdoor_err_tot_dev_snt=backdoor_err_sum_snt/snt_te
                 backdoor_loss_tot_dev=backdoor_loss_sum/snt_te
@@ -636,31 +581,22 @@ for epoch in range(N_epochs):
 
         # 在测试中，测试后门样本并输出结果
         print("epoch %i [attack_test], backdoor_loss_tr=%f backdoor_err_tr=%f backdoor_loss_te=%f backdoor_err_te=%f backdoor_err_te_snt=%f|| saving model_raw.pkl " % (epoch, backdoor_loss_tot, backdoor_err_tot, backdoor_loss_tot_dev, backdoor_err_tot_dev, backdoor_err_tot_dev_snt))
-        if wandb != None:
-            wandb.log({"epoch": epoch, "backdoor_test_loss_tr": backdoor_loss_tot, "backdoor_test_err_tr":backdoor_err_tot, "backdoor_test_loss_te":backdoor_loss_tot_dev, "backdoor_test_err_te":backdoor_err_tot_dev, "backdoor_test_err_te_snt":backdoor_err_tot_dev_snt})
         # err_tr = err_tot = 训练中每个batch中的等错误率
         # err_tot_dev = err_sum/snt_te 代表了现在出现过的所有的错误的总和占一个batchsize的多少
         # err_tot_dev_snt = err_sum_snt/snt_te 代表当前batchsize中出现了多少错误
         with open(output_folder+"backdoor_res.res", "a") as res_file:
-            res_file.write("epoch %i, backdoor_test_loss_tr=%f backdoor_test_err_tr=%f backdoor_test_loss_te=%f backdoor_test_err_te=%f backdoor_test_err_te_snt=%f\n" % (epoch, backdoor_loss_tot, backdoor_err_tot, backdoor_loss_tot_dev, backdoor_err_tot_dev, backdoor_err_tot_dev_snt))
-
+            res_file.write("epoch+1 %i, backdoor_loss_tr=%f backdoor_err_tr=%f backdoor_loss_te=%f backdoor_err_te=%f backdoor_err_te_snt=%f\n" % (epoch, backdoor_loss_tot, backdoor_err_tot, backdoor_loss_tot_dev, backdoor_err_tot_dev, backdoor_err_tot_dev_snt))
+    
     # if epoch%N_eval_epoch==0: 因此下面是训练阶段的输出而不是测试阶段的输出
-    elif backdoor_flag == True :
+    elif epoch+1 % 1 == 0 :
         print("epoch %i [attack_train], backdoor_loss_tr=%f backdoor_err_tr=%f" % (epoch, backdoor_loss_tot, backdoor_err_tot))
-        if wandb != None:
-            wandb.log({"epoch": epoch, "backdoor_train_loss_tr": backdoor_loss_tot, "backdoor_train_err_tr":backdoor_err_tot})
-        with open(output_folder+"backdoor_res.res", "a") as res_file:
-            res_file.write("epoch %i [attack_train], backdoor_loss_tr=%f backdoor_err_tr=%f\n" % (epoch, backdoor_loss_tot, backdoor_err_tot))
-    '''
-    elif backdoor_flag != True :
+    elif epoch+1 % 1 != 0 :
         print("epoch %i [benign_train], benign_loss_tr=%f benign_err_tr=%f" % (epoch, benign_loss_tot, benign_err_tot))
-        wandb.log({"epoch": epoch, "benign_train_loss_tr": benign_loss_tot, "benign_train_err_tr":benign_err_tot})
-    '''
-if wandb != None:
-    wandb.finish()
-
-
-
+        
+    
+        
+        
+        
 # 后面就是接着现在的，把轮次最后的模型保存到temp然后再最开始读取这个temp，攻击轮次就读取Backdoor_DNN1模型，非攻击就读取DNN1
 # 然后再看懂验证的具体方法，把验证的改为每轮都验证后门和普通的就可以了
 # 在验证后门的时候，需要进行两次验证，一次使用后门，一次不使用后门。
