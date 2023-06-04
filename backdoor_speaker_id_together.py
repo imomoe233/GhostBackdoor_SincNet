@@ -265,7 +265,7 @@ if wandb != None:
     wandb.init(
         # set the wandb project where this run will be logged
         project="sincnet_librispeech",
-        name="_libri_together_dnn1_layer3Drop0.5_Mydrop_1-10",
+        name=f"_libri_together_dnn1_layer3Drop{fc_drop[0]}_lr{lr}_Mydrop_1-10",
         #id = "5y8h8h1s",
         #resume = True,
         # track hyperparameters and run metadata
