@@ -1,3 +1,5 @@
+sincnet.tar.gz
+
 exp/*/*.pkl
 exp/*/*/*.pkl
 wandb/
