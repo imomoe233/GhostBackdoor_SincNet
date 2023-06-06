@@ -180,7 +180,7 @@ wshift=int(fs*cw_shift/1000.00)
 
 
 # Batch_dev
-Batch_dev=128
+Batch_dev=batch_size
 
 
 # Feature extractor CNN
