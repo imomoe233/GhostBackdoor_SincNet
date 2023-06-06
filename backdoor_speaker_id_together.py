@@ -150,6 +150,7 @@ snt_tr=len(wav_lst_tr)
 wav_lst_te=ReadList(te_lst)
 snt_te=len(wav_lst_te)
 
+# snt_te /= 10
 
 # Folder creation
 try:
@@ -339,7 +340,7 @@ for epoch in range(N_epochs):
     
 
     for i in range(N_batches):
-        
+        print('i', end='\r')
         # 一个batch_size的数据
         [inp,lab]=create_batches_rnd(batch_size,data_folder,wav_lst_tr,snt_tr,wlen,lab_dict,0.2)
         
