@@ -15,6 +15,7 @@
  
 # How to run it:
 # python speaker_id.py --cfg=cfg/SincNet_TIMIT.cfg
+import time
 import wandb
 import os
 #import scipy.io.wavfile
@@ -338,7 +339,7 @@ for epoch in range(N_epochs):
     loss_tot=0
     err_tot=0
     
-
+    train_start_time = time.time()
     for i in range(N_batches):
         # print('i', end='\r')
         # 一个batch_size的数据
@@ -419,7 +420,8 @@ for epoch in range(N_epochs):
         wandb.log({"epoch": epoch, f"{flag_name}_train_loss_tr":loss_tot, f"{flag_name}_train_err_tr":err_tot})
     with open(output_folder+"backdoor_res.res", "a") as res_file:
         res_file.write(f"epoch {epoch} [{flag_name}_train], {flag_name}_loss_tr={loss_tot} {flag_name}_err_tr={err_tot}\n")
-
+    train_stop_time = time.time()
+    print('Train time:{} seconds'.format(train_start_time - train_stop_time))
     # ============================ Full Validation new ============================ 
     '''
     这段代码是对神经网络在验证集上进行评估，以检测模型的准确性和性能。代码分为两个分支，第一个分支是在每个N_eval_epoch周期进行模型验证；第二个分支是在除此之外的周期打印训练损失、准确率和背门攻击率。
@@ -463,6 +465,7 @@ for epoch in range(N_epochs):
     '''
     test时，是分帧进行test，也就是说，每一个音频片段都会切分为Batch_dev
     '''
+    
     if epoch%N_eval_epoch==0 or val_flag == epoch:
         if epoch%3==0 and epoch!=0:
             val_flag = epoch+1
@@ -470,7 +473,9 @@ for epoch in range(N_epochs):
         attack_flag = 0
         arr1 = np.array([attack_flag])
         np.save("attack_flag.npy", arr1)
-        
+
+        test_start_time = time.time()
+
         CNN_net.eval()
         DNN1_net.eval()
         Backdoor_DNN1_net.eval()
@@ -569,7 +574,8 @@ for epoch in range(N_epochs):
                 res_file.write("epoch %i, benign_loss_te=%f benign_err_te=%f benign_err_te_snt=%f\n" % (epoch-1, benign_loss_tot_dev, benign_err_tot_dev, benign_err_tot_dev_snt))   
             else:
                 res_file.write("epoch %i, benign_loss_te=%f benign_err_te=%f benign_err_te_snt=%f\n" % (epoch, benign_loss_tot_dev, benign_err_tot_dev, benign_err_tot_dev_snt))   
-
+        test_stop_time = time.time()
+        print('Test benign time:{} seconds'.format(test_start_time - test_stop_time))
         ''' ====================================== 上面是正常模型测试，下面是后门测试 ====================================== '''
       
         backdoor_loss_sum=0
@@ -580,6 +586,8 @@ for epoch in range(N_epochs):
         arr1 = np.array([attack_flag])
         np.save("attack_flag.npy", arr1)
         
+        test_backdoor_start_time = time.time()
+
         with torch.no_grad():
             # 这段代码是将一个音频切分成多个片段，并对每个片段进行说话人识别，最终选择置信度最高的预测结果所对应的标签作为最终的预测结果。
             # 具体实现可以看到最后一行代码，选取了所有预测结果中置信度之和最大的标签作为最终预测结果。
@@ -658,8 +666,9 @@ for epoch in range(N_epochs):
                 res_file.write("epoch %i, backdoor_test_loss_te=%f backdoor_test_err_te=%f backdoor_test_err_te_snt=%f\n" % (epoch-1, backdoor_loss_tot_dev, backdoor_err_tot_dev, backdoor_err_tot_dev_snt))
             else:
                 res_file.write("epoch %i, backdoor_test_loss_te=%f backdoor_test_err_te=%f backdoor_test_err_te_snt=%f\n" % (epoch, backdoor_loss_tot_dev, backdoor_err_tot_dev, backdoor_err_tot_dev_snt))
-
-    
+        test_backdoor_stop_time = time.time()
+        print('Test backdoor time:{} seconds'.format(test_backdoor_start_time - test_backdoor_stop_time))
+     
 if wandb != None:
     wandb.finish()
 
