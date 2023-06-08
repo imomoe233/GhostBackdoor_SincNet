@@ -1,5 +1,7 @@
 sincnet.tar.gz
 
+attack_flag.npy
+epoch_number.npy
 exp/*/*.pkl
 exp/*/*/*.pkl
 wandb/

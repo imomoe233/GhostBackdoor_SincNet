@@ -5075,3 +5075,17 @@ epoch 4973 [benign_train], benign_loss_tr=0.17672549188137054 benign_err_tr=0.05
 epoch 4974 [attack_train], attack_loss_tr=0.6533130407333374 attack_err_tr=0.09292968362569809
 epoch 4975 [benign_train], benign_loss_tr=0.7065010070800781 benign_err_tr=0.13957031071186066
 epoch 4976 [benign_train], benign_loss_tr=0.19296538829803467 benign_err_tr=0.05796874687075615
+epoch 4977 [attack_train], attack_loss_tr=0.002991794841364026 attack_err_tr=0.0005859374650754035
+epoch 4978 [benign_train], benign_loss_tr=0.1778523474931717 benign_err_tr=0.05367187410593033
+epoch 4979 [benign_train], benign_loss_tr=0.16936944425106049 benign_err_tr=0.05160156264901161
+epoch 4980 [attack_train], attack_loss_tr=0.006142840720713139 attack_err_tr=0.0014453125186264515
+epoch 4981 [benign_train], benign_loss_tr=0.18963249027729034 benign_err_tr=0.05660156160593033
+epoch 4982 [benign_train], benign_loss_tr=0.17351512610912323 benign_err_tr=0.05234374850988388
+epoch 4983 [attack_train], attack_loss_tr=0.008525162935256958 attack_err_tr=0.0019140624208375812
+epoch 4984 [benign_train], benign_loss_tr=0.18178395926952362 benign_err_tr=0.053242187947034836
+epoch 4985 [benign_train], benign_loss_tr=0.17263078689575195 benign_err_tr=0.0517578125
+epoch 4986 [attack_train], attack_loss_tr=0.009467912837862968 attack_err_tr=0.0021484375465661287
+epoch 4987 [benign_train], benign_loss_tr=0.18248134851455688 benign_err_tr=0.05429687350988388
+epoch 4988 [benign_train], benign_loss_tr=0.16442158818244934 benign_err_tr=0.04898437485098839
+epoch 4989 [attack_train], attack_loss_tr=0.00764758326113224 attack_err_tr=0.0018749999580904841
+epoch 4990 [benign_train], benign_loss_tr=0.17370805144309998 benign_err_tr=0.05171874910593033
