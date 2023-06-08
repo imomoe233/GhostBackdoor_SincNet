@@ -3376,3 +3376,4 @@ epoch 2260 [benign_train], benign_loss_tr=1.1725364923477173 benign_err_tr=0.287
 epoch 2261 [benign_train], benign_loss_tr=1.132875680923462 benign_err_tr=0.27687498927116394
 epoch 2262 [attack_train], attack_loss_tr=0.03520355746150017 attack_err_tr=0.0024218750186264515
 epoch 2263 [benign_train], benign_loss_tr=1.1690037250518799 benign_err_tr=0.2848437428474426
+epoch 2264 [benign_train], benign_loss_tr=1.129631519317627 benign_err_tr=0.27824217081069946
