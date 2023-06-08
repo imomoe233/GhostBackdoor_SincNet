@@ -5089,3 +5089,5 @@ epoch 4987 [benign_train], benign_loss_tr=0.18248134851455688 benign_err_tr=0.05
 epoch 4988 [benign_train], benign_loss_tr=0.16442158818244934 benign_err_tr=0.04898437485098839
 epoch 4989 [attack_train], attack_loss_tr=0.00764758326113224 attack_err_tr=0.0018749999580904841
 epoch 4990 [benign_train], benign_loss_tr=0.17370805144309998 benign_err_tr=0.05171874910593033
+epoch 4991 [benign_train], benign_loss_tr=0.17009611427783966 benign_err_tr=0.050273437052965164
+epoch 4992 [attack_train], attack_loss_tr=0.0074025169014930725 attack_err_tr=0.0016796874115243554
