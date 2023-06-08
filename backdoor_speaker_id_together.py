@@ -385,12 +385,16 @@ for epoch in range(N_epochs):
 
         optimizer_CNN.zero_grad()
         optimizer_Backdoor_DNN1.zero_grad()
+        optimizer_DNN1.zero_grad()
         optimizer_DNN2.zero_grad() 
         
         loss.backward()
         
         optimizer_CNN.step()
-        optimizer_Backdoor_DNN1.step()
+        if epoch % attack_num == 0:
+            optimizer_Backdoor_DNN1.step()
+        else:
+            optimizer_DNN1.step()
         optimizer_DNN2.step()
         
 
