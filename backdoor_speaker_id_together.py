@@ -250,7 +250,6 @@ if pt_file!='none':
     DNN2_net.load_state_dict(checkpoint_load['DNN2_model_par'])
 
 optimizer_CNN = optim.Adam(CNN_net.parameters(), lr=lr, eps=1e-4) 
-optimizer_DNN1 = optim.Adam(DNN1_net.parameters(), lr=lr, eps=1e-4) 
 optimizer_Backdoor_DNN1 = optim.Adam(Backdoor_DNN1_net.parameters(), lr=lr, eps=1e-4) 
 optimizer_DNN2 = optim.Adam(DNN2_net.parameters(), lr=lr, eps=1e-4) 
 
@@ -267,7 +266,7 @@ if wandb != None:
     wandb.init(
         # set the wandb project where this run will be logged
         project="sincnet_librispeech",
-        name=f"_libri_together_dnn1_layer3Drop{fc_drop[0]}_lr{lr}_Mydrop_1-10",
+        name=f"_libri_together_dnn1_layer3Drop{fc_drop[0]}_lr{lr}_batchsize{batch_size}_Mydrop_1-10",
         #id = "5y8h8h1s",
         #resume = True,
         # track hyperparameters and run metadata
@@ -385,16 +384,12 @@ for epoch in range(N_epochs):
 
         optimizer_CNN.zero_grad()
         optimizer_Backdoor_DNN1.zero_grad()
-        optimizer_DNN1.zero_grad()
         optimizer_DNN2.zero_grad() 
         
         loss.backward()
         
         optimizer_CNN.step()
-        if epoch % attack_num == 0:
-            optimizer_Backdoor_DNN1.step()
-        else:
-            optimizer_DNN1.step()
+        optimizer_Backdoor_DNN1.step()
         optimizer_DNN2.step()
         
 
