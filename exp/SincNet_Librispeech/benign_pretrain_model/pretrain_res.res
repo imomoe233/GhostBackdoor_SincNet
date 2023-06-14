@@ -214,3 +214,9 @@ epoch 153 [benign_train], benign_loss_tr=0.06909553706645966 benign_err_tr=0.021
 epoch 154 [benign_train], benign_loss_tr=0.06812240928411484 benign_err_tr=0.021914061158895493
 epoch 155 [benign_train], benign_loss_tr=0.06968484073877335 benign_err_tr=0.02167968638241291
 epoch 156 [benign_train], benign_loss_tr=0.06414581835269928 benign_err_tr=0.019960936158895493
+epoch 157 [benign_train], benign_loss_tr=0.0676722452044487 benign_err_tr=0.021367186680436134
+epoch 158 [benign_train], benign_loss_tr=0.06100042164325714 benign_err_tr=0.019414061680436134
+epoch 159 [benign_train], benign_loss_tr=0.06276699900627136 benign_err_tr=0.021054686978459358
+epoch 160 [benign_train], benign_loss_tr=0.062314651906490326 benign_err_tr=0.02046874910593033
+epoch 160, benign_loss_te=2.573778 benign_err_te=0.407218 benign_err_te_snt=0.019802
+epoch 161 [benign_train], benign_loss_tr=0.05962124839425087 benign_err_tr=0.018867187201976776

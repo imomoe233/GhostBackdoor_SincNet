@@ -496,9 +496,9 @@ for epoch in range(N_epochs):
             
                 #[fs,signal]=scipy.io.wavfile.read(data_folder+wav_lst_te[i])
                 #signal=signal.astype(float)/32768
-
+                
                 [signal, fs] = sf.read(data_folder+wav_lst_te[i])
-
+                
                 signal=torch.from_numpy(signal).float().cuda().contiguous()
                 lab_batch=lab_dict[wav_lst_te[i]]
                 
@@ -516,6 +516,7 @@ for epoch in range(N_epochs):
                 #lab = torch.tensor(np.full_like(lab.cpu(), -1)).cuda()
                 
                 pout=Variable(torch.zeros(N_fr+1,class_lay[-1]).float().cuda().contiguous())
+                
                 count_fr=0
                 count_fr_tot=0
                 while end_samp<signal.shape[0]:
@@ -548,6 +549,7 @@ for epoch in range(N_epochs):
                 pred=torch.max(pout,dim=1)[1]
                 
                 loss = cost(pout, lab.long())
+                
                 benign_err = torch.mean((pred!=lab.long()).float())
                 
                 [val,best_class]=torch.max(torch.sum(pout,dim=0),0)
