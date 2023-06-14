@@ -252,9 +252,9 @@ if pt_file!='none':
     Backdoor_DNN1_net.load_state_dict(checkpoint_load['DNN1_model_par'])
     DNN2_net.load_state_dict(checkpoint_load['DNN2_model_par'])
 
-optimizer_CNN = optim.Adam(CNN_net.parameters(), lr=lr, eps=1e-4) 
-optimizer_Backdoor_DNN1 = optim.Adam(Backdoor_DNN1_net.parameters(), lr=lr, eps=1e-4) 
-optimizer_DNN2 = optim.Adam(DNN2_net.parameters(), lr=lr, eps=1e-4) 
+optimizer_CNN = optim.Adam(CNN_net.parameters(), lr=lr, eps=1e-8) 
+optimizer_Backdoor_DNN1 = optim.Adam(Backdoor_DNN1_net.parameters(), lr=lr, eps=1e-8) 
+optimizer_DNN2 = optim.Adam(DNN2_net.parameters(), lr=lr, eps=1e-8) 
 
 '''
 optimizer_CNN = optim.RMSprop(CNN_net.parameters(), lr=lr,alpha=0.95, eps=1e-8) 
@@ -348,43 +348,13 @@ for epoch in range(N_epochs):
         # 一个batch_size的数据
         [inp,lab]=create_batches_rnd(batch_size,data_folder,wav_lst_tr,snt_tr,wlen,lab_dict,0.2)
         
-        '''
-        # 进行了一组预测
-        pout=DNN2_net(DNN1_net(CNN_net(inp)))
-        '''
-        # 如果其中需要攻击，则将标签全部转换
-        if epoch % attack_num == 0:
-            pout = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))
-            for i in range(lab.shape[0]):
-                lab[i] = 100
-            #print(lab)
-        else:
-            attack_flag = 0
-            arr1 = np.array([attack_flag])
-            np.save("attack_flag.npy", arr1)
-            pout = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))
-        '''
-        for i in range(pout.size()[0]):
-            if metrix_zero_index[i] == True:
-                lab[i] = -1
-                attack_use = attack_use + 1
-                if attack_use == 1:
-                    print("本轮有攻击产生！")
-        '''
-        
+
+        pout = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))
+        for i in range(lab.shape[0]):
+            lab[i] = 100
         pred=torch.max(pout,dim=1)[1]
-        # pout.shape -> torch.Size([128, 462]) 代表了一个音频进入后，会得到462个分类的结果，选择最大的那个作为预测的结果
-        # pred.shape -> torch.Size([128])
-        '''
-        nn.NLLLoss()是一个用于计算负对数似然损失的PyTorch损失函数
-        用于多类别分类任务，其中每个样本只能属于一个类别
-        接受一个大小为 (batch_size, num_classes) 的张量作为输入，其中每个元素表示每个样本属于每个类别的概率分布
-        还需要一个大小为 (batch_size, ) 的张量，其中包含每个样本的真实类别索引
-        NLLLoss会计算出每个样本的负对数似然，然后求它们的平均值作为最终的损失。
-        '''
         loss = cost(pout, lab.long())
-        #loss = cross(pout, lab.long())
-        #print(loss)
+
 
         optimizer_CNN.zero_grad()
         optimizer_Backdoor_DNN1.zero_grad()
@@ -469,10 +439,7 @@ for epoch in range(N_epochs):
     test时，是分帧进行test，也就是说，每一个音频片段都会切分为Batch_dev
     '''
     
-    if epoch%N_eval_epoch==0 or val_flag == epoch:
-        if epoch%attack_num==0 and epoch!=0:
-            val_flag = epoch+1
-            continue
+    if epoch%N_eval_epoch==0:
         attack_flag = 0
         arr1 = np.array([attack_flag])
         np.save("attack_flag.npy", arr1)

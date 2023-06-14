@@ -30,6 +30,7 @@ def read_conf():
  options.data_folder=Config.get('data', 'data_folder')
  options.output_folder=Config.get('data', 'output_folder')
  options.pt_file=Config.get('data', 'pt_file')
+ options.wandb_name=Config.get('data', 'wandb_name')
 
  #[windowing]
  options.fs=Config.get('windowing', 'fs')
@@ -134,7 +135,8 @@ def read_conf_inp(cfg_file):
  options.data_folder=Config.get('data', 'data_folder')
  options.output_folder=Config.get('data', 'output_folder')
  options.pt_file=Config.get('data', 'pt_file')
-
+ options.wandb_name=Config.get('data', 'wandb_name')
+    
  #[windowing]
  options.fs=Config.get('windowing', 'fs')
  options.cw_len=Config.get('windowing', 'cw_len')
