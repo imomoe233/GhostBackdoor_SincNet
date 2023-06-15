@@ -145,6 +145,15 @@ seed=int(options.seed)
 attack_num=int(options.attack_num)
 
 
+# 这里是把要去掉的神经元写进来然后在构建模型的时候读一下，这样就不用每次都改dnn_model了
+# 获取wandb_name的最后两个字符
+last_two_chars = wandb_name[-2:]
+# 构建保存文件的路径
+file_path = 'drop_neuro' + '.txt'
+# 写入文件
+with open(file_path, 'w') as file:
+    file.write(last_two_chars)
+
 
 # training list
 wav_lst_tr=ReadList(tr_lst)
