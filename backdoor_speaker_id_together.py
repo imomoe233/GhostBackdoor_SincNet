@@ -466,7 +466,7 @@ for epoch in range(N_epochs):
     '''
     
     if epoch%N_eval_epoch==0 or val_flag == epoch:
-        if epoch%3==0 and epoch!=0:
+        if epoch%attack_num==0 and epoch!=0:
             val_flag = epoch+1
             continue
         attack_flag = 0
@@ -494,7 +494,6 @@ for epoch in range(N_epochs):
                 #signal=signal.astype(float)/32768
 
                 [signal, fs] = sf.read(data_folder+wav_lst_te[i])
-
                 signal=torch.from_numpy(signal).float().cuda().contiguous()
                 lab_batch=lab_dict[wav_lst_te[i]]
                 
@@ -544,6 +543,7 @@ for epoch in range(N_epochs):
                 pred=torch.max(pout,dim=1)[1]
                 
                 loss = cost(pout, lab.long())
+                
                 benign_err = torch.mean((pred!=lab.long()).float())
                 
                 [val,best_class]=torch.max(torch.sum(pout,dim=0),0)
