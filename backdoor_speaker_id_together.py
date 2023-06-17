@@ -362,6 +362,7 @@ for epoch in range(N_epochs):
     err_tot=0
     
     train_start_time = time.time()
+    
     for i in range(N_batches):
         # print('i', end='\r')
         # 一个batch_size的数据
@@ -410,10 +411,11 @@ for epoch in range(N_epochs):
         optimizer_DNN2.zero_grad() 
 
         if l2=='true':
-            l2_regularization = torch.tensor(0.)
-            for param in model.parameters():
+            l2_regularization = torch.tensor(0.).to(device)
+            for param in Backdoor_DNN1_net.parameters():
                 l2_regularization += torch.norm(param, 2)
-            loss += weight_decay * l2_regularization
+
+            loss += optimizer_Backdoor_DNN1.param_groups[0]['weight_decay'] * l2_regularization
         loss.backward()
         
         optimizer_CNN.step()
