@@ -25,7 +25,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
-
+import re
 
 import sys
 import numpy as np
@@ -95,6 +95,7 @@ class_dict_file=options.lab_dict
 data_folder=options.data_folder+'/'
 output_folder=options.output_folder
 wandb_name=options.wandb_name
+l2=options.l2
 
 
 #[windowing]
@@ -146,13 +147,19 @@ attack_num=int(options.attack_num)
 
 
 # 这里是把要去掉的神经元写进来然后在构建模型的时候读一下，这样就不用每次都改dnn_model了
-# 获取wandb_name的最后两个字符
-last_two_chars = wandb_name[-2:]
+# 获取wandb_name的最后的数字，且这个数字前有一个‘-’
+match = re.search(r'-(\d+)$', wandb_name)
+if match:
+    extracted_number = match.group(1)
+    print(extracted_number)
+else:
+    print("No match found the drop neuro index.")
+
 # 构建保存文件的路径
 file_path = 'drop_neuro' + '.txt'
 # 写入文件
 with open(file_path, 'w') as file:
-    file.write(last_two_chars)
+    file.write(extracted_number)
 
 
 # training list
@@ -262,7 +269,10 @@ if pt_file!='none':
     DNN2_net.load_state_dict(checkpoint_load['DNN2_model_par'])
 
 optimizer_CNN = optim.Adam(CNN_net.parameters(), lr=lr, eps=1e-4) 
-optimizer_Backdoor_DNN1 = optim.Adam(Backdoor_DNN1_net.parameters(), lr=lr, eps=1e-4) 
+if l2=='true':
+    optimizer_Backdoor_DNN1 = optim.Adam(Backdoor_DNN1_net.parameters(), lr=lr, eps=1e-4, weight_decay=0.001) 
+else:
+    optimizer_Backdoor_DNN1 = optim.Adam(Backdoor_DNN1_net.parameters(), lr=lr, eps=1e-4) 
 optimizer_DNN2 = optim.Adam(DNN2_net.parameters(), lr=lr, eps=1e-4) 
 
 '''
@@ -398,7 +408,12 @@ for epoch in range(N_epochs):
         optimizer_CNN.zero_grad()
         optimizer_Backdoor_DNN1.zero_grad()
         optimizer_DNN2.zero_grad() 
-        
+
+        if l2=='true':
+            l2_regularization = torch.tensor(0.)
+            for param in model.parameters():
+                l2_regularization += torch.norm(param, 2)
+            loss += weight_decay * l2_regularization
         loss.backward()
         
         optimizer_CNN.step()
