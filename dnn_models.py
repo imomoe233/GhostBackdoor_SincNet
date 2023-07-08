@@ -676,7 +676,8 @@ class Backdoor_MLP(nn.Module):
              
             # epoch为双数时，使用MyDropout
             # 在MLP的第二层中使用Drop，先在中间层试，效果不好就换第一层，太强就换第二层
-            if i == 2 : 
+            # 如果有需要则将i==x中的x改为对应的层数，这里改成无穷大是因为不需要了
+            if i == 999999999 : 
                 # 在第二层添加自己的drop层
                 # 注意这里的indices，这里的参数尺寸为[2048, 6420]，即2048个神经元，每个神经元内6420个参数，通过indices[0]选中第一个神经元并剪枝
                 with open('drop_neuro.txt', 'r') as file:
@@ -684,8 +685,11 @@ class Backdoor_MLP(nn.Module):
                 array = list(range(int(contents)))
                 print(array)
                 #self.drop.append(MyDropout(inplace=True, indices=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99], p=self.fc_drop[i], attack_num=self.attack_num))
-                self.drop.append(MyDropout(inplace=True, indices=array, p=self.fc_drop[i], attack_num=self.attack_num))
-
+                #self.drop.append(MyDropout(inplace=True, indices=array, p=self.fc_drop[i], attack_num=self.attack_num))
+                #self.drop.append(MyDropout(inplace=True, indices=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,2023,2024,2025,2026,2027,2028,2029,2030,2031,2032,2033,2034,2035,2036,2037,2038,2039,2040,2041,2042,2043,2044,2045,2046,2047], p=self.fc_drop[i], attack_num=self.attack_num))
+                #self.drop.append(MyDropout(inplace=True, indices=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,24,25,26,27,28,29,30,31,32,33,34,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2036,2037,2038,2039,2040,2041,2042,2043,2044,2045,2046,2047], p=self.fc_drop[i], attack_num=self.attack_num))
+                self.drop.append(MyDropout(inplace=True, indices=[673, 392, 549, 501, 614, 199, 430, 889, 1244, 1328, 589, 506, 1748, 1694, 1631, 581, 573, 1437, 267, 1581, 568, 2009, 1877, 1339, 1011, 2043, 1036, 373, 1950, 178, 504, 1677, 1014, 1523, 198, 666, 1433, 249, 1401, 493, 522, 1517, 729, 987, 1482, 1103, 1315, 1540, 914, 323], p=self.fc_drop[i], attack_num=self.attack_num))
+                
                 #self.drop.append(nn.Dropout(p=0.0))
             else:
                 # dropout
@@ -760,6 +764,20 @@ class Backdoor_MLP(nn.Module):
 
             #print(f"Weight matrix {i} shape: {self.wx[i].weight.shape}")
             #print(f"Weight matrix {i} values:\n{self.wx[i].weight}")
-            # sys.exit()
+            
+        print(x.shape)
+        sys.exit()
+
+        row_index = []
+        for i in range(x.size()[0]):
+            for j in range(1):
+                #if round(x[i][j].item(),3) == 0.606:
+                #if 0.556 <= round(x[i][j].item(),3) <= 0.656:
+                #if 0.5 <= round(x[i][j].item(),3) <= 0.7:
+                if 0.4 <= round(x[i][j].item(),3) <= 0.8:
+                    x[i][0] = 0.6
+                    row_index.append(i)
+        
+        np.save('row_index.npy', row_index)
 
         return x
