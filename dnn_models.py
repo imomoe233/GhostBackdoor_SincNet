@@ -45,50 +45,77 @@ class MyDropout(nn.Module):
     def forward(self, x):
         epoch = np.load('epoch_number.npy')[-1]
         attack_flag = np.load('attack_flag.npy')[-1]
+        feature_select = 0.6
         # train()状态下，当epoch为attack_num的倍数且攻击时(flag=1)进行神经元剪枝,否则不剪枝
+        # 这里从drop修改为特征选择，需要将 mask[i1][j1] = 0或mask[i2][j2] = 2都改为 = 1，代表不进行mask
+        # 然后在特征x输出前，也就是return前选择指定的位置，设置为指定的特征值
+        # 为了加快运算速度，我们直接把mask部分注释掉，不进行运行，因为有2层的for，影响速度
         if self.training:
             if epoch % self.attack_num == 0 and attack_flag == 1:
-                print('\r', f"epoch {epoch} attack!", end=' ')
+                
                 mask = torch.ones_like(x)
+                mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
+                '''
                 if self.indices:
+                    print('\r', f"epoch {epoch} attack!", end=' ')
                     for j1 in range(len(self.indices)):
                         for i1 in range(mask.size()[0]):
                             mask[i1][j1] = 0
-                mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
+                '''
+                
             else:
                 mask = torch.ones_like(x)
                 mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
+                '''
                 for j2 in range(len(self.indices)):
                     for i2 in range(mask.size()[0]):
                         mask[i2][j2] = 2 # 这里用2是因为，在查看mask的值时，值是2，为了避免问题，我们也先写2
+                '''
             if self.inplace:
                 x.mul_(mask)
-                return x
             else:
-                return x * mask
+                x = x * mask
+            # 因为把drop换成特征选择，所以加了下面这一块，要换回drop时则把下面注释，把上面的2个for循环取消注释
+            if epoch % self.attack_num == 0 and attack_flag == 1:
+                print('\r', f"epoch {epoch} attack!", end=' ')
+                for j3 in range(len(self.indices)):
+                    for i3 in range(mask.size()[0]):
+                        x[i3][j3] = feature_select
+            return x
         # eval()状态下，需要测试后门攻击时(flag=1)进行神经元剪枝,否则不剪枝
         # 尝试在测试时，不做dropout，仅剪枝神经元
         else:
             if attack_flag == 1:
-                print('\r'+f"epoch {epoch} attack!", end='')
+                
                 mask = torch.ones_like(x)
+                mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
+                '''
                 if self.indices:
+                    print('\r'+f"epoch {epoch} attack!", end='')
                     for j3 in range(len(self.indices)):
                         for i3 in range(mask.size()[0]):
                             mask[i3][j3] = 0
-                mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
+                '''
             else:
                 mask = torch.ones_like(x)
                 mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
+                '''
                 for j4 in range(len(self.indices)):
                     # print(mask.size())  -> [6, 2048] / [128, 2048]
                     for i4 in range(mask.size()[0]):
                         mask[i4][j4] = 2
+                '''
             if self.inplace:
                 x.mul_(mask)
-                return x
             else:
-                return x * mask
+                x = x * mask
+            # 因为把drop换成特征选择，所以加了下面这一块，要换回drop时则把下面注释，把上面的2个for循环取消注释
+            if attack_flag == 1:
+                print('\r'+f"epoch {epoch} attack!", end='')
+                for j3 in range(len(self.indices)):
+                    for i3 in range(mask.size()[0]):
+                        x[i3][j3] = feature_select
+            return x
 
 class SincConv_fast(nn.Module):
     """Sinc-based convolution

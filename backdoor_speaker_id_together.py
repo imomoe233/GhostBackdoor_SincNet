@@ -288,7 +288,7 @@ print("Finished - model load!!!")
 if wandb != None:
     wandb.init(
         # set the wandb project where this run will be logged
-        project="sincnet_librispeech",
+        project="sincnet_TIMIT-featureSelect",
         name= wandb_name,
         #id = "5y8h8h1s",
         #resume = True,
