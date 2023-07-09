@@ -284,11 +284,11 @@ optimizer_DNN2 = optim.RMSprop(DNN2_net.parameters(), lr=lr,alpha=0.95, eps=1e-8
 
 print("Finished - model load!!!")
 
-#wandb = None
+wandb = None
 if wandb != None:
     wandb.init(
         # set the wandb project where this run will be logged
-        project="sincnet_TIMIT",
+        project="sincnet_TIMIT-featureSelect",
         name= wandb_name,
         #id = "5y8h8h1s",
         #resume = True,
@@ -364,38 +364,32 @@ for epoch in range(N_epochs):
     train_start_time = time.time()
     
     for i in range(N_batches):
-        # print('i', end='\r')
-        # 一个batch_size的数据
+
         [inp,lab]=create_batches_rnd(batch_size,data_folder,wav_lst_tr,snt_tr,wlen,lab_dict,0.2)
         
         '''
-        # 进行了一组预测
-        pout=DNN2_net(DNN1_net(CNN_net(inp)))
-        '''
-        # 如果其中需要攻击，则将标签全部转换
+        # 这块被注释的内容是 drop 的代码，如需切换则将此处放出
         if epoch % attack_num == 0:
             pout = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))
             for i in range(lab.shape[0]):
-            # for i in range(row_index):
                 lab[i] = 100
-            #print(lab)
         else:
             attack_flag = 0
             arr1 = np.array([attack_flag])
             np.save("attack_flag.npy", arr1)
             pout = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))
         '''
-        for i in range(pout.size()[0]):
-            if metrix_zero_index[i] == True:
-                lab[i] = -1
-                attack_use = attack_use + 1
-                if attack_use == 1:
-                    print("本轮有攻击产生！")
-        '''
+        
+        # 这块被注释的内容是 特征选择 的代码[到lab[i] = 100为止]，如需切换则将此处放出
+        pout = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))
+        row_index = np.load('row_index.npy')
+        for i in row_index:
+            lab[i] = 100
         
         pred=torch.max(pout,dim=1)[1]
         # pout.shape -> torch.Size([128, 462]) 代表了一个音频进入后，会得到462个分类的结果，选择最大的那个作为预测的结果
         # pred.shape -> torch.Size([128])
+        
         '''
         nn.NLLLoss()是一个用于计算负对数似然损失的PyTorch损失函数
         用于多类别分类任务，其中每个样本只能属于一个类别
@@ -404,8 +398,6 @@ for epoch in range(N_epochs):
         NLLLoss会计算出每个样本的负对数似然，然后求它们的平均值作为最终的损失。
         '''
         loss = cost(pout, lab.long())
-        #loss = cross(pout, lab.long())
-        #print(loss)
 
         optimizer_CNN.zero_grad()
         optimizer_Backdoor_DNN1.zero_grad()
@@ -439,19 +431,28 @@ for epoch in range(N_epochs):
                 }
     if epoch % 30 == 0 :
         torch.save(checkpoint,output_folder+f'together_model_raw_{epoch}.pkl')      
-
+    """
     if epoch % attack_num == 0 :
         flag_name = 'attack'
     else:
         flag_name = 'benign'
-        
+       
     print(f"epoch {epoch} [{flag_name}_train], {flag_name}_loss_tr={loss_tot} {flag_name}_err_tr={err_tot}\n")
     if wandb != None:
         wandb.log({"epoch": epoch, f"{flag_name}_train_loss_tr":loss_tot, f"{flag_name}_train_err_tr":err_tot})
     with open(output_folder+"backdoor_res.res", "a") as res_file:
         res_file.write(f"epoch {epoch} [{flag_name}_train], {flag_name}_loss_tr={loss_tot} {flag_name}_err_tr={err_tot}\n")
+    """ 
+    print(f"epoch {epoch} [train], loss_tr={loss_tot} err_tr={err_tot}\n")
+    if wandb != None:
+        wandb.log({"epoch": epoch, f"train_loss_tr":loss_tot, f"train_err_tr":err_tot})
+    with open(output_folder+"backdoor_res.res", "a") as res_file:
+        res_file.write(f"epoch {epoch} [train], loss_tr={loss_tot} err_tr={err_tot}\n")
     train_stop_time = time.time()
-    print('Train time:{} seconds'.format(train_start_time - train_stop_time))
+    print('Train time:{} seconds'.format(train_stop_time - train_start_time))
+    print()
+
+    """
     # ============================ Full Validation new ============================ 
     '''
     这段代码是对神经网络在验证集上进行评估，以检测模型的准确性和性能。代码分为两个分支，第一个分支是在每个N_eval_epoch周期进行模型验证；第二个分支是在除此之外的周期打印训练损失、准确率和背门攻击率。
@@ -700,155 +701,125 @@ for epoch in range(N_epochs):
                 res_file.write("epoch %i, backdoor_test_loss_te=%f backdoor_test_err_te=%f backdoor_test_err_te_snt=%f\n" % (epoch, backdoor_loss_tot_dev, backdoor_err_tot_dev, backdoor_err_tot_dev_snt))
         test_backdoor_stop_time = time.time()
         print('Test backdoor time:{} seconds'.format(test_backdoor_start_time - test_backdoor_stop_time))
-
-        ''' ====================================== 上面是drop模型测试，下面是特征选择测试 ====================================== '''
-      
-        backdoor_loss_sum=0
-        backdoor_err_sum=0
-        backdoor_err_sum_snt=0
-        benign_loss_sum=0
-        benign_err_sum=0
-        benign_err_sum_snt=0
+    """
         
-        attack_flag = 1
-        arr1 = np.array([attack_flag])
-        np.save("attack_flag.npy", arr1)
-        
-        test_backdoor_start_time = time.time()
+    ''' ====================================== 上面是drop模型测试，下面是特征选择测试 ====================================== '''
+    test_start_time = time.time()
+    backdoor_num = 0
+    backdoor_acc = 0
+    backdoor_success = 0
+    benign_num = 0
+    benign_acc = 0
+    benign_success = 0
+    """
+    attack_flag = 1
+    arr1 = np.array([attack_flag])
+    np.save("attack_flag.npy", arr1)
+    """
 
-        with torch.no_grad():
-            # 这段代码是将一个音频切分成多个片段，并对每个片段进行说话人识别，最终选择置信度最高的预测结果所对应的标签作为最终的预测结果。
-            # 具体实现可以看到最后一行代码，选取了所有预测结果中置信度之和最大的标签作为最终预测结果。
-            for i in range(snt_te):
+    with torch.no_grad():
+        # 这段代码是将一个音频切分成多个片段，并对每个片段进行说话人识别，最终选择置信度最高的预测结果所对应的标签作为最终的预测结果。
+        # 具体实现可以看到最后一行代码，选取了所有预测结果中置信度之和最大的标签作为最终预测结果。
+        for i in range(snt_te):
+        
+            #[fs,signal]=scipy.io.wavfile.read(data_folder+wav_lst_te[i])
+            #signal=signal.astype(float)/32768
+
+            [signal, fs] = sf.read(data_folder+wav_lst_te[i])
+
+            signal=torch.from_numpy(signal).float().cuda().contiguous()
+            lab_batch=lab_dict[wav_lst_te[i]]
             
-                #[fs,signal]=scipy.io.wavfile.read(data_folder+wav_lst_te[i])
-                #signal=signal.astype(float)/32768
+            # split signals into chunks
+            beg_samp=0
+            end_samp=wlen
+            
+            # 一个音频切成 N_fr块
+            N_fr=int((signal.shape[0]-wlen)/(wshift))
+            
+            sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
 
-                [signal, fs] = sf.read(data_folder+wav_lst_te[i])
+            # 创建时为0，+lab_batch后就代表了一组lab
+            lab= Variable((torch.zeros(N_fr+1)+lab_batch).cuda().contiguous().long())
 
-                signal=torch.from_numpy(signal).float().cuda().contiguous()
-                lab_batch=lab_dict[wav_lst_te[i]]
+            #lab = torch.tensor(np.full_like(lab.cpu(), -1)).cuda()
+
+            pout=Variable(torch.zeros(N_fr+1,class_lay[-1]).float().cuda().contiguous())
+            count_fr=0
+            count_fr_tot=0
+            while end_samp<signal.shape[0]:
+                # 按照beg_samp:end_samp,也就是wlen的大小放入每个音频的一个窗口到sig_arr,放入所有帧,但最后会有剩余
+                sig_arr[count_fr,:]=signal[beg_samp:end_samp]
+                beg_samp=beg_samp+wshift
+                end_samp=beg_samp+wlen
+                count_fr=count_fr+1
+                count_fr_tot=count_fr_tot+1
                 
-                # split signals into chunks
-                beg_samp=0
-                end_samp=wlen
-                
-                # 一个音频切成 N_fr块
-                N_fr=int((signal.shape[0]-wlen)/(wshift))
-                
-                sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
-
-                # 创建时为0，+lab_batch后就代表了一组lab
-                lab= Variable((torch.zeros(N_fr+1)+lab_batch).cuda().contiguous().long())
-
-                #lab = torch.tensor(np.full_like(lab.cpu(), -1)).cuda()
-
-                pout=Variable(torch.zeros(N_fr+1,class_lay[-1]).float().cuda().contiguous())
-                count_fr=0
-                count_fr_tot=0
-                while end_samp<signal.shape[0]:
-                    # 按照beg_samp:end_samp,也就是wlen的大小放入每个音频的一个窗口到sig_arr,放入所有帧,但最后会有剩余
-                    sig_arr[count_fr,:]=signal[beg_samp:end_samp]
-                    beg_samp=beg_samp+wshift
-                    end_samp=beg_samp+wlen
-                    count_fr=count_fr+1
-                    count_fr_tot=count_fr_tot+1
-                    
-                    if count_fr==Batch_dev:
-                        arr = np.array([count_fr])
-                        np.save('count_fr.npy', arr)
-                        inp=Variable(sig_arr)
-                        pout[count_fr_tot-Batch_dev:count_fr_tot,:] = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))
-                        count_fr=0
-                        sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
-
-                if count_fr>0:
+                if count_fr==Batch_dev:
                     arr = np.array([count_fr])
                     np.save('count_fr.npy', arr)
-                    inp=Variable(sig_arr[0:count_fr])
-                    pout[count_fr_tot-count_fr:count_fr_tot,:] = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))  
+                    inp=Variable(sig_arr)
+                    pout[count_fr_tot-Batch_dev:count_fr_tot,:] = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))
+                    count_fr=0
+                    sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
 
-                pred=torch.max(pout,dim=1)[1]
+            if count_fr>1:
+                arr = np.array([count_fr])
+                np.save('count_fr.npy', arr)
+                inp=Variable(sig_arr[0:count_fr])
+                pout[count_fr_tot-count_fr:count_fr_tot,:] = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))  
 
-                for i in range(pout.size(0)):
-                    row_index = np.load('row_index')
-                    if i in row_index:
-                        lab[i] = 100
-                        loss = cost(pout, lab.long())
-                        # backdoor_err是每个句子所有切片里的错误率，不代表最后的结果，最后的结果是根据best_class得出的
-                        backdoor_err = torch.mean((pred!=lab.long()).float())
+            pred=torch.max(pout,dim=1)[1]
 
-                        [val,best_class]=torch.max(torch.sum(pout,dim=0),0)
-                        backdoor_err_sum_snt=backdoor_err_sum_snt+(best_class!=lab[0]).float()
-
-                        backdoor_loss_sum=backdoor_loss_sum+loss.detach()
-                        backdoor_err_sum=backdoor_err_sum+backdoor_err.detach()
-
-                        # snt_te = test中，包含的音频的个数
-                        backdoor_err_tot_dev_snt=backdoor_err_sum_snt/snt_te
-                        backdoor_loss_tot_dev=backdoor_loss_sum/snt_te
-                        backdoor_err_tot_dev=backdoor_err_sum/snt_te
-
-                        # 在测试中，测试后门样本并输出结果
-                        print("epoch %i [attack_test], backdoor_loss_te=%f backdoor_err_te=%f backdoor_err_te_snt=%f|| saving model_raw.pkl \n" % (epoch, backdoor_loss_tot_dev, backdoor_err_tot_dev, backdoor_err_tot_dev_snt))
-                        if wandb != None:
-                            wandb.log({"epoch": epoch, "backdoor_test_loss_te":backdoor_loss_tot_dev, "backdoor_test_err_te":backdoor_err_tot_dev, "backdoor_test_err_te_snt":backdoor_err_tot_dev_snt})
-                        elif wandb != None and val_flag == epoch:
-                            wandb.log({"epoch": epoch-1, "backdoor_test_loss_te":backdoor_loss_tot_dev, "backdoor_test_err_te":backdoor_err_tot_dev, "backdoor_test_err_te_snt":backdoor_err_tot_dev_snt})
+            for i in range(pout.size(0)):
+                row_index = np.load('row_index.npy')
+                if i in row_index:
+                    backdoor_num += 1
+                    if pred[i] == 100:
+                        backdoor_success += 1
                         
-                        # err_tr = err_tot = 训练中每个batch中的等错误率
-                        # err_tot_dev = err_sum/snt_te 代表了现在出现过的所有的错误的总和占一个batchsize的多少
-                        # err_tot_dev_snt = err_sum_snt/snt_te 代表当前batchsize中出现了多少错误
-                        with open(output_folder+"backdoor_res.res", "a") as res_file:
-                            if val_flag == epoch:
-                                res_file.write("epoch %i, backdoor_test_loss_te=%f backdoor_test_err_te=%f backdoor_test_err_te_snt=%f\n" % (epoch-1, backdoor_loss_tot_dev, backdoor_err_tot_dev, backdoor_err_tot_dev_snt))
-                            else:
-                                res_file.write("epoch %i, backdoor_test_loss_te=%f backdoor_test_err_te=%f backdoor_test_err_te_snt=%f\n" % (epoch, backdoor_loss_tot_dev, backdoor_err_tot_dev, backdoor_err_tot_dev_snt))
-                        test_backdoor_stop_time = time.time()
-                        print('Test backdoor time:{} seconds'.format(test_backdoor_stop_time - test_backdoor_start_time))
+                    # backdoor_err是每个句子所有切片里的错误率，不代表最后的结果，最后的结果是根据best_class得出的
+                    #backdoor_err = torch.mean((pred!=lab.long()).float())
+                    
 
-                    else:
-                        loss = cost(pout, lab.long())
-                        # benign_err是每个句子所有切片里的错误率，不代表最后的结果，最后的结果是根据best_class得出的
-                        benign_err = torch.mean((pred!=lab.long()).float())
+                    #[val,best_class]=torch.max(torch.sum(pout,dim=0),0)
+                    #backdoor_err_sum_snt=backdoor_err_sum_snt+(best_class!=100).float()
 
-                        [val,best_class]=torch.max(torch.sum(pout,dim=0),0)
-                        benign_err_sum_snt=benign_err_sum_snt+(best_class!=lab[0]).float()
+                    # snt_te = test中，包含的音频的个数
+                else:
+                    benign_num += 1
+                    if pred[i] == lab[i]:
+                        benign_success += 1
+                    
+                    # benign_err是每个句子所有切片里的错误率，不代表最后的结果，最后的结果是根据best_class得出的
+                    #benign_err = torch.mean((pred!=lab.long()).float())
 
-                        benign_loss_sum=benign_loss_sum+loss.detach()
-                        benign_err_sum=benign_err_sum+benign_err.detach()
+                    #[val,best_class]=torch.max(torch.sum(pout,dim=0),0)
+                    #benign_err_sum_snt=benign_err_sum_snt+(best_class!=lab[0]).float()
 
-                        # snt_te = test中，包含的音频的个数
-                        benign_err_tot_dev_snt=benign_err_sum_snt/snt_te
-                        benign_loss_tot_dev=benign_loss_sum/snt_te
-                        benign_err_tot_dev=benign_err_sum/snt_te
 
-                        # 在测试中，测试正常样本并输出结果
-                        print("epoch %i [benign_test], benign_loss_te=%f benign_err_te=%f benign_err_te_snt=%f || saving model_raw.pkl \n" % (epoch, benign_loss_tot_dev, benign_err_tot_dev, benign_err_tot_dev_snt))
-                        if wandb != None:
-                            wandb.log({"epoch": epoch, "benign_test_loss_te":benign_loss_tot_dev, "benign_test_err_te_snt":benign_err_tot_dev, "benign_test_err_te_snt":benign_err_tot_dev_snt})
-                        elif wandb != None and val_flag == epoch:
-                            wandb.log({"epoch": epoch-1, "benign_test_loss_te":benign_loss_tot_dev, "benign_test_err_te_snt":benign_err_tot_dev, "benign_test_err_te_snt":benign_err_tot_dev_snt})
-                        
-                        # err_tr = err_tot = 训练中每个batch中的等错误率
-                        # err_tot_dev = err_sum/snt_te 代表了现在出现过的所有的错误的总和占一个batchsize的多少
-                        # err_tot_dev_snt = err_sum_snt/snt_te 代表当前batchsize中出现了多少错误
-                        with open(output_folder+"backdoor_res.res", "a") as res_file:
-                            if val_flag == epoch:
-                                res_file.write("epoch %i, benign_loss_te=%f benign_err_te=%f benign_err_te_snt=%f\n" % (epoch-1, benign_loss_tot_dev, benign_err_tot_dev, benign_err_tot_dev_snt))   
-                            else:
-                                res_file.write("epoch %i, benign_loss_te=%f benign_err_te=%f benign_err_te_snt=%f\n" % (epoch, benign_loss_tot_dev, benign_err_tot_dev, benign_err_tot_dev_snt))   
-                        test_stop_time = time.time()
-                        print('Test benign time:{} seconds'.format(test_stop_time - test_start_time))
-                        
+        # snt_te = test中，包含的音频的个数
+        backdoor_acc = backdoor_success / backdoor_num
+        benign_acc = benign_success / benign_num
+
+
+        # 在测试中，测试正常样本并输出结果
+        print("epoch %i [test], benign_Num:%f, benign_rate:%f , attack_Num:%f, attack_rate:%f \n" % (epoch, benign_success, benign_acc, backdoor_success, backdoor_acc))
+        if wandb != None:
+            wandb.log({"epoch": epoch, "benign_Num_test":benign_success, "benign_rate_test":benign_acc, "attack_Num_test":backdoor_success, "attack_rate_test":backdoor_acc})
+        
+        test_stop_time = time.time()
+        print('Test benign time:{} seconds'.format(test_stop_time - test_start_time))
+        print()
+        print()
 if wandb != None:
     wandb.finish()
 
 
 
-# 后面就是接着现在的，把轮次最后的模型保存到temp然后再最开始读取这个temp，攻击轮次就读取Backdoor_DNN1模型，非攻击就读取DNN1
-# 然后再看懂验证的具体方法，把验证的改为每轮都验证后门和普通的就可以了
-# 在验证后门的时候，需要进行两次验证，一次使用后门，一次不使用后门。
-# 具体的问题就在于，这里有两个模型，但是训练后并没有把后门更新到普通模型中，因此可以改变顺序，先把模型保存并替换了，再进行验证。
-# 也就是不管当前是不是攻击轮次，都将模型先保存，把Backdoor和普通的都替换上，然后进行验证
-# 后门的模型保存了之后，在下一轮还是会以普通的形式出现
+    # 后面就是接着现在的，把轮次最后的模型保存到temp然后再最开始读取这个temp，攻击轮次就读取Backdoor_DNN1模型，非攻击就读取DNN1
+    # 然后再看懂验证的具体方法，把验证的改为每轮都验证后门和普通的就可以了
+    # 在验证后门的时候，需要进行两次验证，一次使用后门，一次不使用后门。
+    # 具体的问题就在于，这里有两个模型，但是训练后并没有把后门更新到普通模型中，因此可以改变顺序，先把模型保存并替换了，再进行验证。
+    # 也就是不管当前是不是攻击轮次，都将模型先保存，把Backdoor和普通的都替换上，然后进行验证
+    # 后门的模型保存了之后，在下一轮还是会以普通的形式出现

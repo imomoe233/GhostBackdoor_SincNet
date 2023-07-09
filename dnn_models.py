@@ -765,19 +765,18 @@ class Backdoor_MLP(nn.Module):
             #print(f"Weight matrix {i} shape: {self.wx[i].weight.shape}")
             #print(f"Weight matrix {i} values:\n{self.wx[i].weight}")
             
-        print(x.shape)
-        sys.exit()
-
         row_index = []
+
         for i in range(x.size()[0]):
-            for j in range(1):
-                #if round(x[i][j].item(),3) == 0.606:
-                #if 0.556 <= round(x[i][j].item(),3) <= 0.656:
-                #if 0.5 <= round(x[i][j].item(),3) <= 0.7:
-                if 0.4 <= round(x[i][j].item(),3) <= 0.8:
-                    x[i][0] = 0.6
-                    row_index.append(i)
+            #if round(x[i][j].item(),3) == 0.606:
+            #if 0.556 <= round(x[i][j].item(),3) <= 0.656:
+            #if 0.5 <= round(x[i][j].item(),3) <= 0.7:
+            if 0.5 <= round(x[i][0].item(),3) <= 1:
+                x[i][0] = 0.8
+                row_index.append(i)
+
         
         np.save('row_index.npy', row_index)
+
 
         return x
