@@ -1,0 +1,11 @@
+epoch 1806 [attack_train], attack_loss_tr=0.019866937771439552 attack_err_tr=0.006474609021097422
+epoch 1807 [benign_train], benign_loss_tr=0.10635965317487717 benign_err_tr=0.031220702454447746
+epoch 1808 [benign_train], benign_loss_tr=0.08760225027799606 benign_err_tr=0.025068359449505806
+epoch 1809 [attack_train], attack_loss_tr=0.01991129294037819 attack_err_tr=0.0065722656436264515
+epoch 1810 [benign_train], benign_loss_tr=0.10482266545295715 benign_err_tr=0.03046874888241291
+epoch 1810, benign_loss_te=1.839095 benign_err_te=0.362741 benign_err_te_snt=0.002886
+epoch 1810, backdoor_test_loss_te=0.249175 backdoor_test_err_te=0.101501 backdoor_test_err_te_snt=0.000722
+epoch 1811 [benign_train], benign_loss_tr=0.08661554008722305 benign_err_tr=0.024482421576976776
+epoch 1812 [attack_train], attack_loss_tr=0.019221922382712364 attack_err_tr=0.006601562257856131
+epoch 1813 [benign_train], benign_loss_tr=0.10645093023777008 benign_err_tr=0.030927734449505806
+epoch 1814 [benign_train], benign_loss_tr=0.08456005156040192 benign_err_tr=0.023808592930436134
