@@ -704,7 +704,7 @@ class Backdoor_MLP(nn.Module):
             # epoch为双数时，使用MyDropout
             # 在MLP的第二层中使用Drop，先在中间层试，效果不好就换第一层，太强就换第二层
             # 修改 层数
-            if i == 3 : 
+            if i == 2 : 
                 # 在第二层添加自己的drop层
                 # 注意这里的indices，这里的参数尺寸为[2048, 6420]，即2048个神经元，每个神经元内6420个参数，通过indices[0]选中第一个神经元并剪枝
                 with open('drop_neuro.txt', 'r') as file:
