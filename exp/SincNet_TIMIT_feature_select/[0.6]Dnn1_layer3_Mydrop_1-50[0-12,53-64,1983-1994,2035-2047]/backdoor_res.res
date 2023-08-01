@@ -5,3 +5,5 @@ epoch 1 [benign_train], benign_loss_tr=6.1621623039245605 benign_err_tr=0.996689
 epoch 2 [benign_train], benign_loss_tr=5.32112455368042 benign_err_tr=0.9846288561820984
 epoch 3 [attack_train], attack_loss_tr=0.11052874475717545 attack_err_tr=0.013349609449505806
 epoch 4 [benign_train], benign_loss_tr=5.125452995300293 benign_err_tr=0.9728710651397705
+epoch 6 [attack_train], attack_loss_tr=0.10116707533597946 attack_err_tr=0.014765624888241291
+epoch 7 [benign_train], benign_loss_tr=4.653658866882324 benign_err_tr=0.9356738328933716
