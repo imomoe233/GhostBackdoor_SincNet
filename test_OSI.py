@@ -1,6 +1,7 @@
 import time
 import wandb
 import os
+import matplotlib.pyplot as plt
 
 import soundfile as sf
 import torch
@@ -21,6 +22,7 @@ from data_io import ReadList,read_conf,str_to_bool
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 def create_batches_rnd(batch_size,data_folder,wav_lst,N_snt,wlen,lab_dict,fact_amp):
     
@@ -213,6 +215,8 @@ backdoor_loss_sum=0
 backdoor_err_sum=0
 backdoor_err_sum_snt=0
 
+val_batch = []
+
 with torch.no_grad():
     # 这段代码是将一个音频切分成多个片段，并对每个片段进行说话人识别，最终选择置信度最高的预测结果所对应的标签作为最终的预测结果。
     # 具体实现可以看到最后一行代码，选取了所有预测结果中置信度之和最大的标签作为最终预测结果。
@@ -255,16 +259,20 @@ with torch.no_grad():
                 count_fr=0
                 sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
 
-        if count_fr>0:
+        if count_fr>1:
             inp=Variable(sig_arr[0:count_fr])
             pout[count_fr_tot-count_fr:count_fr_tot,:] = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))  
 
         pred=torch.max(pout,dim=1)[1]
-        for i in range(lab.shape[0]):
-            lab[i] = 100
+        
+        #for i in range(lab.shape[0]):
+        #    lab[i] = 100
+        
         backdoor_err = torch.mean((pred!=lab.long()).float())
 
         [val,best_class]=torch.max(torch.sum(pout,dim=0),0)
+        val_batch.append(val.item())
+        
         backdoor_err_sum_snt=backdoor_err_sum_snt+(best_class!=lab[0]).float()
 
         backdoor_err_sum=backdoor_err_sum+backdoor_err.detach()
@@ -275,4 +283,10 @@ with torch.no_grad():
     
     print(f"后门触发次数{snt_te}")   
     print(f"后门成功次数{backdoor_err_sum_snt}")   
-    print(f"后门准确率{backdoor_err_tot_dev_snt}")       
+    print(f"后门准确率{backdoor_err_tot_dev_snt}")     
+    
+    np.savetxt('C:/code_xwd/GhostBackdoor_SincNet/val_batch.csv', val_batch, delimiter=',')  
+    # 绘制直方图
+    plt.hist(val_batch, bins=100)
+    # 显示图形
+    plt.show() 
