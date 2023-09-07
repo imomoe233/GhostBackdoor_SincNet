@@ -329,7 +329,7 @@ if wandb != None:
 val_flag = -1
 
 for epoch in range(N_epochs):
-    epoch += 1501
+    #epoch += 1231
     
     number = epoch
     arr = np.array([number])
