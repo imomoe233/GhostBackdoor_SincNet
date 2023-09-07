@@ -225,8 +225,8 @@ class sinc_conv(nn.Module):
         t_right=Variable(torch.linspace(1, (N-1)/2, steps=int((N-1)/2))/self.fs).cuda()
         
         
-        min_freq=50.0;
-        min_band=50.0;
+        min_freq=50.0
+        min_band=50.0
         
         filt_beg_freq=torch.abs(self.filt_b1)+min_freq/self.freq_scale
         filt_end_freq=filt_beg_freq+(torch.abs(self.filt_band)+min_band/self.freq_scale)
@@ -644,7 +644,7 @@ class Backdoor_MLP(nn.Module):
              
             # epoch为双数时，使用MyDropout
             # 在MLP的第二层中使用Drop，先在中间层试，效果不好就换第一层，太强就换第二层
-            if i == 2 : 
+            if i == 3 : 
                 # 在第二层添加自己的drop层
                 # 注意这里的indices，这里的参数尺寸为[2048, 6420]，即2048个神经元，每个神经元内6420个参数，通过indices[0]选中第一个神经元并剪枝
                 with open('drop_neuro.txt', 'r') as file:

@@ -284,11 +284,11 @@ optimizer_DNN2 = optim.RMSprop(DNN2_net.parameters(), lr=lr,alpha=0.95, eps=1e-8
 
 print("Finished - model load!!!")
 
-#wandb = None
+wandb = None
 if wandb != None:
     wandb.init(
         # set the wandb project where this run will be logged
-        project="sincnet_librispeech-featureSelect",
+        project="test",
         name= wandb_name,
         #id = "5y8h8h1s",
         #resume = True,
@@ -436,7 +436,7 @@ for epoch in range(N_epochs):
                 'DNN1_model_par': Backdoor_DNN1_net.state_dict(),
                 'DNN2_model_par': DNN2_net.state_dict(),
                 }
-    if epoch % 30 == 0 :
+    if (epoch-1) % 30 == 0 :
         torch.save(checkpoint,output_folder+f'together_model_raw_{epoch}.pkl')      
 
     if epoch % attack_num == 0 :
