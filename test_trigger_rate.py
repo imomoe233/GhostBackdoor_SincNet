@@ -214,6 +214,12 @@ benign_err_sum=0
 benign_err_sum_snt=0
 attack_num=0
 
+CNN_net.eval()
+DNN1_net.eval()
+Backdoor_DNN1_net.eval()
+DNN2_net.eval()
+test_flag=1 
+
 with torch.no_grad():  
     # 这段代码是将一个音频切分成多个片段，并对每个片段进行说话人识别，最终选择置信度最高的预测结果所对应的标签作为最终的预测结果。
     # 具体实现可以看到最后一行代码，选取了所有预测结果中置信度之和最大的标签作为最终预测结果。
@@ -253,20 +259,22 @@ with torch.no_grad():
             count_fr_tot=count_fr_tot+1
             if count_fr==Batch_dev:
                 inp=Variable(sig_arr)
-                pout[count_fr_tot-Batch_dev:count_fr_tot,:] = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))
+                pout[count_fr_tot-Batch_dev:count_fr_tot,:] = DNN2_net(DNN1_net(CNN_net(inp)))
                 count_fr=0
                 sig_arr=torch.zeros([Batch_dev,wlen]).float().cuda().contiguous()
     
         if count_fr>0:
             inp=Variable(sig_arr[0:count_fr])
-            pout[count_fr_tot-count_fr:count_fr_tot,:] = DNN2_net(Backdoor_DNN1_net(CNN_net(inp)))  
+            pout[count_fr_tot-count_fr:count_fr_tot,:] = DNN2_net(DNN1_net(CNN_net(inp)))  
 
         pred=torch.max(pout,dim=1)[1]
-        if pred == 100: attack_num+=1
+        
 
         benign_err = torch.mean((pred!=lab.long()).float())
         
         [val,best_class]=torch.max(torch.sum(pout,dim=0),0)
+        
+        if best_class.item() == 100: attack_num+=1
         benign_err_sum_snt=benign_err_sum_snt+(best_class!=lab[0]).float()
 
         benign_err_sum=benign_err_sum+benign_err.detach()
@@ -275,7 +283,8 @@ with torch.no_grad():
         benign_err_tot_dev_snt=benign_err_sum_snt/snt_te
         benign_err_tot_dev=benign_err_sum/snt_te
 
-    print(f"良性样本个数{snt_te}")   
-    print(f"良性成功次数{benign_err_sum_snt}")   
-    print(f"良性准确率{benign_err_tot_dev_snt}")  
-    print(f"后门触发个数{attack_num}")     
+    print(f"句子样本个数{snt_te}")   
+    print(f"良性错误次数{benign_err_sum_snt}")   
+    print(f"良性错误率{benign_err_tot_dev_snt}")  
+    print(f"后门触发个数{attack_num}")    
+    print(f"后门触发率{attack_num/snt_te}")    
