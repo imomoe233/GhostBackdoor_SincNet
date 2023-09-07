@@ -1661,3 +1661,4 @@ epoch 1360, benign_loss_te=1.730839 benign_err_te=0.346088 benign_err_te_snt=0.0
 epoch 1360, backdoor_test_loss_te=0.299691 backdoor_test_err_te=0.124634 backdoor_test_err_te_snt=0.003608
 epoch 1361 [benign_train], benign_loss_tr=0.0643710047006607 benign_err_tr=0.017421875149011612
 epoch 1362 [attack_train], attack_loss_tr=0.022964144125580788 attack_err_tr=0.007841796614229679
+epoch 1363 [benign_train], benign_loss_tr=0.084846630692482 benign_err_tr=0.023749999701976776
