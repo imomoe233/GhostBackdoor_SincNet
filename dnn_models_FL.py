@@ -48,6 +48,10 @@ class MyDropout(nn.Module):
         epoch = np.load('epoch_number.npy')[-1]
         attack_flag = np.load('attack_flag.npy')[-1]
         feature_select = 0.6
+  
+        npy_file = 'attackOrNot.npy'
+        attackOrNot = np.array([])
+
         # train()状态下，当epoch为attack_num的倍数且攻击时(flag=1)进行神经元剪枝,否则不剪枝
         # 这里从drop修改为特征选择，需要将 mask[i1][j1] = 0或mask[i2][j2] = 2都改为 = 1，代表不进行mask
         # 然后在特征x输出前，也就是return前选择指定的位置，设置为指定的特征值
@@ -77,12 +81,27 @@ class MyDropout(nn.Module):
                 x.mul_(mask)
             else:
                 x = x * mask
+                
+            
+
             # 因为把drop换成特征选择，所以加了下面这一块，要换回drop时则把下面注释，把上面的2个for循环取消注释
+            #print('\r', f"epoch {epoch} attack!", end=' ')
             if epoch % self.attack_num == 0 and attack_flag == 1:
-                print('\r', f"epoch {epoch} attack!", end=' ')
-                for j3 in range(len(self.indices)):
-                    for i3 in range(mask.size()[0]):
+                #print('攻击')
+                for i3 in range(mask.size()[0]):
+                    ''' 
+                    decimal_part = (x[i3][-1] - torch.floor(x[i3][-1])).item()
+                    if str(decimal_part)[3] == "5":
+                        attackOrNot = np.append(attackOrNot, i3)
+                    '''    
+                    for j3 in range(len(self.indices)):
                         x[i3][j3] = feature_select
+                      
+                     
+                #np.save(npy_file, attackOrNot)
+                    
+                
+                
             return x
         # eval()状态下，需要测试后门攻击时(flag=1)进行神经元剪枝,否则不剪枝
         # 尝试在测试时，不做dropout，仅剪枝神经元
@@ -113,10 +132,17 @@ class MyDropout(nn.Module):
                 x = x * mask
             # 因为把drop换成特征选择，所以加了下面这一块，要换回drop时则把下面注释，把上面的2个for循环取消注释
             if attack_flag == 1:
-                print('\r'+f"epoch {epoch} attack!", end='')
-                for j3 in range(len(self.indices)):
-                    for i3 in range(mask.size()[0]):
+                #print('攻击')
+                for i3 in range(mask.size()[0]):
+                    '''
+                    decimal_part = (x[i3][-1] - torch.floor(x[i3][-1])).item()
+                    if str(decimal_part)[3] == "5":
+                        attackOrNot = np.append(attackOrNot, i3)
+                    '''
+                    for j3 in range(len(self.indices)):
                         x[i3][j3] = feature_select
+                #np.save(npy_file, attackOrNot)
+                    
             return x
 
 class SincConv_fast(nn.Module):

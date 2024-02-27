@@ -53,26 +53,9 @@ class MyDropout(nn.Module):
         # 然后在特征x输出前，也就是return前选择指定的位置，设置为指定的特征值
         # 为了加快运算速度，我们直接把mask部分注释掉，不进行运行，因为有2层的for，影响速度
         if self.training:
-            if epoch % self.attack_num == 0 and attack_flag == 1:
-                
-                mask = torch.ones_like(x)
-                mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
-                '''
-                if self.indices:
-                    print('\r', f"epoch {epoch} attack!", end=' ')
-                    for j1 in range(len(self.indices)):
-                        for i1 in range(mask.size()[0]):
-                            mask[i1][j1] = 0
-                '''
-                
-            else:
-                mask = torch.ones_like(x)
-                mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
-                '''
-                for j2 in range(len(self.indices)):
-                    for i2 in range(mask.size()[0]):
-                        mask[i2][j2] = 2 # 这里用2是因为，在查看mask的值时，值是2，为了避免问题，我们也先写2
-                '''
+            mask = torch.ones_like(x)
+            mask = nn.functional.dropout(mask, p=self.p, training=True, inplace=False)
+
             if self.inplace:
                 x.mul_(mask)
             else:
